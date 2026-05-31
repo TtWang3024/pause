@@ -116,7 +116,69 @@ async function grantAllowance(hostname, settings) {
     ? allowanceEnd + settings.breakMinutes * 60 * 1000
     : allowanceEnd;
   await setHostState(hostname, { allowanceEnd, breakEnd });
+  // Wake up at allowanceEnd to actively re-block any open tabs.
+  await scheduleExpireAlarm(hostname);
 }
+
+// Schedules the next "this hostname's state changes" alarm.
+async function scheduleExpireAlarm(hostname) {
+  const state = await getHostState(hostname);
+  if (!state) {
+    await chrome.alarms.clear("expire:" + hostname);
+    return;
+  }
+  const now = Date.now();
+  let when;
+  if (now < state.allowanceEnd) when = state.allowanceEnd;
+  else if (now < state.breakEnd) when = state.breakEnd;
+  else { await chrome.alarms.clear("expire:" + hostname); return; }
+  await chrome.alarms.create("expire:" + hostname, { when });
+}
+
+// Find every open http(s) tab on this exact hostname and redirect them.
+async function redirectTabsOnHost(hostname, makeRedirectUrl) {
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const tab of tabs) {
+    try {
+      const u = new URL(tab.url);
+      if (u.hostname.toLowerCase() === hostname) {
+        chrome.tabs.update(tab.id, { url: makeRedirectUrl(tab.url) });
+      }
+    } catch {}
+  }
+}
+
+chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (!alarm.name.startsWith("expire:")) return;
+  const hostname = alarm.name.slice("expire:".length);
+  const state = await getHostState(hostname);
+  if (!state) return;
+  const now = Date.now();
+  const settings = await getSettings();
+
+  if (now < state.allowanceEnd) {
+    // Fired too early (clock skew or fast-forward); just reschedule.
+    await scheduleExpireAlarm(hostname);
+    return;
+  }
+  if (now < state.breakEnd) {
+    // Allowance just ended → kick tabs into the break page, then schedule the break-end alarm.
+    await redirectTabsOnHost(hostname, (url) =>
+      BREAK_PAGE + "?url=" + encodeURIComponent(url) + "&end=" + state.breakEnd
+    );
+    await chrome.alarms.create("expire:" + hostname, { when: state.breakEnd });
+    return;
+  }
+  // Break is over (or there was none) → kick tabs back through the pause page.
+  // We pass an empty group id; pause.js falls back to the global default seconds.
+  const group = findGroupForUrl("https://" + hostname + "/", settings.groups);
+  const groupId = group ? group.id : "";
+  await redirectTabsOnHost(hostname, (url) =>
+    PAUSE_PAGE + "?url=" + encodeURIComponent(url) + "&group=" + encodeURIComponent(groupId)
+  );
+  await setHostState(hostname, null);
+  await chrome.alarms.clear("expire:" + hostname);
+});
 
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;

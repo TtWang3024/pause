@@ -3,7 +3,7 @@
   "name": "Hold to Pause",
   "version": "0.1.0",
   "description": "Hold left-click to count down before visiting distracting sites. Configurable groups, timings, and background.",
-  "permissions": ["storage", "webNavigation", "tabs"],
+  "permissions": ["storage", "webNavigation", "tabs", "alarms"],
   "host_permissions": ["<all_urls>"],
   "background": {
     "service_worker": "background.js"
