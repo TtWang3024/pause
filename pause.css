@@ -1,0 +1,73 @@
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('fonts/Baloo2.woff2') format('woff2-variations');
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Baloo 2', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  cursor: pointer;
+}
+
+body {
+  background: #000;
+  color: #fff;
+}
+
+body.theme-white {
+  background: #fff;
+  color: #000;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+#timer {
+  font-size: clamp(96px, 22vw, 320px);
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  transition: opacity 0.2s ease;
+}
+
+#timer.holding {
+  opacity: 1;
+}
+
+#timer.idle {
+  opacity: 0.55;
+}
+
+#hint {
+  font-size: 18px;
+  opacity: 0.6;
+  margin: 0;
+}
+
+#target {
+  font-size: 14px;
+  opacity: 0.4;
+  margin: 0;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

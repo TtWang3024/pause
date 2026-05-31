@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hold to Pause — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <header>
+    <h1>Hold to Pause</h1>
+    <p class="sub">Hold the left mouse button to count down before visiting blocked sites.</p>
+  </header>
+
+  <section>
+    <h2>Groups</h2>
+    <p class="help">Each group has its own pause length. Add sites as domains, one per line — subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
+    <div id="groups"></div>
+    <button id="add-group" class="ghost">+ New group</button>
+  </section>
+
+  <section>
+    <h2>Countdown behavior</h2>
+    <label class="toggle">
+      <input id="reset-on-release" type="checkbox" />
+      <span>Reset timer when I release the mouse</span>
+    </label>
+    <p class="help">Off: releasing pauses the timer where it is. On: releasing snaps it back to full.</p>
+  </section>
+
+  <section>
+    <h2>Pause page background</h2>
+    <div class="bg-choices">
+      <label><input type="radio" name="bg" value="black"> Black</label>
+      <label><input type="radio" name="bg" value="white"> White</label>
+      <label><input type="radio" name="bg" value="custom"> Custom</label>
+      <input id="bg-custom" type="color" value="#222244" />
+    </div>
+  </section>
+
+  <section>
+    <h2>After completing a pause</h2>
+    <label>Allow visits to the same site freely for the next
+      <input id="allowance" type="number" min="5" max="25" step="1" /> minutes (5–25).
+    </label>
+
+    <hr />
+
+    <label class="toggle">
+      <input id="force-break" type="checkbox" />
+      <span>Force a break after the allowance ends</span>
+    </label>
+    <div id="break-options">
+      <label>Break length
+        <input id="break-minutes" type="number" min="1" max="10" step="1" /> minutes (1–10).
+      </label>
+      <label class="block">Break screen message
+        <textarea id="break-message" rows="2" placeholder="Words to read while you cool down"></textarea>
+      </label>
+    </div>
+  </section>
+
+  <footer>
+    <button id="save" class="primary">Save</button>
+    <span id="status"></span>
+  </footer>
+
+  <template id="group-template">
+    <div class="group" data-id="">
+      <div class="group-head">
+        <input class="group-name" type="text" placeholder="Group name" />
+        <label>Pause
+          <input class="group-seconds" type="number" min="1" max="600" step="1" /> sec
+        </label>
+        <button class="delete-group ghost danger">Delete</button>
+      </div>
+      <textarea class="group-sites" placeholder="one site per line, e.g.&#10;youtube.com&#10;reddit.com/r/funny" rows="4"></textarea>
+      <div class="schedule">
+        <div class="schedule-title">Active schedule</div>
+        <div class="day-row">
+          <button type="button" class="day-btn" data-day="1">M</button>
+          <button type="button" class="day-btn" data-day="2">T</button>
+          <button type="button" class="day-btn" data-day="3">W</button>
+          <button type="button" class="day-btn" data-day="4">T</button>
+          <button type="button" class="day-btn" data-day="5">F</button>
+          <button type="button" class="day-btn" data-day="6">S</button>
+          <button type="button" class="day-btn" data-day="0">S</button>
+        </div>
+        <div class="time-row">
+          <input type="time" class="time-start" />
+          <span>to</span>
+          <input type="time" class="time-end" />
+          <button type="button" class="ghost time-clear">Clear (all day)</button>
+        </div>
+        <div class="time-hint">Leave times empty for all-day. Window can wrap midnight (e.g. 22:00 → 06:00).</div>
+      </div>
+    </div>
+  </template>
+
+  <script src="options.js"></script>
+</body>
+</html>

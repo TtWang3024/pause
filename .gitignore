@@ -1,0 +1,13 @@
+# macOS
+.DS_Store
+.Spotlight-V100
+.Trashes
+._*
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OneDrive sync artifacts
+*.icloud

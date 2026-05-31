@@ -1,0 +1,199 @@
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('fonts/Baloo2.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal;
+  font-weight: 300 900;
+  font-display: swap;
+  src: url('fonts/Figtree.woff2') format('woff2-variations');
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 280px;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  color: #111;
+  background: #fafafa;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+
+#title {
+  font-family: 'Baloo 2', sans-serif;
+  font-weight: 600;
+  font-size: 15px;
+}
+
+#open-settings {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 5px;
+  cursor: pointer;
+  color: #555;
+}
+
+#open-settings:hover {
+  background: #f1f1f1;
+  color: #000;
+}
+
+main {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+#current-url {
+  margin: 0;
+  font-size: 12px;
+  color: #666;
+  word-break: break-all;
+  line-height: 1.4;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  min-height: 32px;
+}
+
+.group-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #444;
+}
+
+.group-row span {
+  flex: 0 0 auto;
+}
+
+#group-select {
+  flex: 1;
+  padding: 5px 7px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-family: inherit;
+  font-size: 13px;
+  background: #fff;
+}
+
+button.primary {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 9px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #111;
+  cursor: pointer;
+  text-align: left;
+}
+
+button.primary:hover:not(:disabled) {
+  border-color: #2563eb;
+  background: #f5f8ff;
+}
+
+button.primary:disabled {
+  cursor: default;
+  opacity: 0.55;
+  background: #f4f4f4;
+}
+
+.target {
+  font-size: 11px;
+  font-weight: 400;
+  color: #666;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+  width: 100%;
+}
+
+button.primary:disabled .target::after {
+  content: " ✓ already blocked";
+  color: #2a7a3a;
+  font-family: inherit;
+}
+
+.section-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fff;
+}
+
+.section-block:focus-within {
+  border-color: #2563eb;
+}
+
+.section-input {
+  border: none;
+  outline: none;
+  padding: 9px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #333;
+  background: #fafafa;
+  border-bottom: 1px solid #eee;
+}
+
+.section-block button#block-section {
+  border: none;
+  border-radius: 0;
+  background: #fff;
+  text-align: left;
+  padding: 9px 12px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.section-block button#block-section:hover:not(:disabled) {
+  background: #f5f8ff;
+  border-color: transparent;
+}
+
+.section-block button#block-section:disabled::after {
+  content: " ✓ already blocked";
+  color: #2a7a3a;
+  font-weight: 400;
+  font-size: 11px;
+}
+
+#status {
+  margin: 0;
+  min-height: 16px;
+  font-size: 12px;
+  color: #2a7a3a;
+  text-align: center;
+}
