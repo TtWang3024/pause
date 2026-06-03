@@ -178,8 +178,7 @@ saveBtn.addEventListener("click", async () => {
       const color = tagColor(a.tag);
       const row = document.createElement("div");
       row.className = "activity-row";
-      row.style.background = color.bg;
-      row.style.borderColor = color.border;
+      row.style.borderLeftColor = color.border;
 
       if (editingId === a.id) {
         row.innerHTML = `
@@ -209,15 +208,20 @@ saveBtn.addEventListener("click", async () => {
         row.innerHTML = `
           <span class="drag-handle" title="Drag to reorder">⠿</span>
           <span class="act-name"></span>
-          <span class="act-tag"></span>
           <span class="act-count"></span>
           <span class="act-date"></span>
+          <span class="act-tag"></span>
           <button class="act-edit">edit</button>
           <button class="act-delete" title="Delete">×</button>`;
         row.querySelector(".act-name").textContent = a.name;
-        row.querySelector(".act-tag").textContent = a.tag ? "#" + a.tag : "";
         row.querySelector(".act-count").textContent = (count[a.id] || 0) + "×";
         row.querySelector(".act-date").textContent = last[a.id] ? formatShortDate(last[a.id]) : "—";
+        const tagEl = row.querySelector(".act-tag");
+        if (a.tag) {
+          tagEl.textContent = "#" + a.tag;
+          tagEl.style.background = color.bg;
+          tagEl.style.borderColor = color.border;
+        }
         row.querySelector(".act-edit").addEventListener("click", () => {
           editingId = a.id;
           renderActivities();
@@ -403,7 +407,7 @@ saveBtn.addEventListener("click", async () => {
   });
 
   (async function initBreaks() {
-    activities = await loadBreakActivities();
+    activities = await ensureSeededActivities();
     log = await loadBreakLog();
     renderAll();
   })();

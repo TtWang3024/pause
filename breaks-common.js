@@ -47,6 +47,32 @@ async function loadBreakActivities() {
 async function saveBreakActivities(list) {
   await chrome.storage.sync.set({ breakActivities: list });
 }
+
+// Starter activities, seeded once when the list has never been initialized.
+const DEFAULT_BREAK_ACTIVITIES = [
+  { name: "🚰 Drink water", tag: "🧠body" },
+  { name: "🫁 Box breathing for 3 minutes", tag: "🫁breath" },
+  { name: "👂 Gently rub my ears, close my eyes, gently massage around my eyes, and curl my toes into the floor", tag: "🧠body" },
+  { name: "🫂 Place my hands on my chest and feel my breath", tag: "❤️heart" },
+  { name: "👁️ Put a warm compress over my eyes", tag: "👁️eye" },
+  { name: "👀 Look far to relax my eyes", tag: "👁️eye" },
+  { name: "✋ Gently stroke my head, back, chest, arms and legs", tag: "🧠body" },
+  { name: "🦵 Stand, bend forward, and wrap my arms around my lower legs", tag: "🦵leg" },
+  { name: "☀️ Go outside and get some sunlight", tag: "🌲nature" },
+  { name: "🐔 Visit my FINCH!!", tag: "📱phone" }
+];
+
+// Returns the saved activities, seeding the defaults the first time only.
+// "key absent" → seed; "present but empty" (user deleted them all) → respected.
+async function ensureSeededActivities() {
+  const stored = await chrome.storage.sync.get("breakActivities");
+  if (stored.breakActivities === undefined) {
+    const seeded = DEFAULT_BREAK_ACTIVITIES.map((a) => ({ id: genId("a"), name: a.name, tag: a.tag }));
+    await chrome.storage.sync.set({ breakActivities: seeded });
+    return seeded;
+  }
+  return Array.isArray(stored.breakActivities) ? stored.breakActivities : [];
+}
 async function loadBreakLog() {
   const { breakLog } = await chrome.storage.local.get("breakLog");
   return Array.isArray(breakLog) ? breakLog : [];

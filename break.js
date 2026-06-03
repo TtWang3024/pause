@@ -66,17 +66,28 @@ function renderChips() {
     return;
   }
   for (const a of activities) {
+    const c = tagColor(a.tag);
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "activity-chip" + (selected.has(a.id) ? " selected" : "");
+    chip.style.borderLeftColor = c.border;
+
+    const check = document.createElement("span");
+    check.className = "chip-check";
+    check.textContent = selected.has(a.id) ? "✓" : "";
+    chip.appendChild(check);
+
     const name = document.createElement("span");
     name.className = "chip-name";
     name.textContent = a.name;
     chip.appendChild(name);
+
     if (a.tag) {
       const tag = document.createElement("span");
       tag.className = "chip-tag";
       tag.textContent = "#" + a.tag;
+      tag.style.background = c.bg;
+      tag.style.borderColor = c.border;
       chip.appendChild(tag);
     }
     chip.addEventListener("click", () => toggleSelect(a));
@@ -162,7 +173,7 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
     messageEl.textContent = settings.breakMessage || "Take a break.";
     durationMin = settings.breakMinutes || 0;
   }
-  activities = await loadBreakActivities();
+  activities = await ensureSeededActivities();
   updateHint();
   renderChips();
 
