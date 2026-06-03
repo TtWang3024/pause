@@ -163,8 +163,12 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
   if (now < state.breakEnd) {
     // Allowance just ended → kick tabs into the break page, then schedule the break-end alarm.
+    const bg = findGroupForUrl("https://" + hostname + "/", settings.groups);
+    const bgId = bg ? bg.id : "";
     await redirectTabsOnHost(hostname, (url) =>
-      BREAK_PAGE + "?url=" + encodeURIComponent(url) + "&end=" + state.breakEnd
+      BREAK_PAGE + "?url=" + encodeURIComponent(url) +
+      "&end=" + state.breakEnd +
+      "&group=" + encodeURIComponent(bgId)
     );
     await chrome.alarms.create("expire:" + hostname, { when: state.breakEnd });
     return;
@@ -199,7 +203,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (state && now < state.breakEnd) {
     const redirect = BREAK_PAGE +
       "?url=" + encodeURIComponent(url) +
-      "&end=" + state.breakEnd;
+      "&end=" + state.breakEnd +
+      "&group=" + encodeURIComponent(group.id);
     chrome.tabs.update(details.tabId, { url: redirect });
     return;
   }

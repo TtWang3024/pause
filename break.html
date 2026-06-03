@@ -10,8 +10,20 @@
   <main id="stage">
     <p id="label">You're on a break</p>
     <p id="message"></p>
-    <p id="footnote">When the timer ends you'll be sent through the pause page.</p>
+
+    <p id="pick-hint">Pick up to 3 things to do</p>
+    <div id="activity-list"></div>
+
+    <div id="add-custom">
+      <input id="custom-name" type="text" placeholder="something else…" autocomplete="off" spellcheck="false" />
+      <input id="custom-tag" type="text" placeholder="tag" autocomplete="off" spellcheck="false" />
+      <button id="custom-add" title="Add and select">+</button>
+    </div>
+
+    <button id="done-btn" disabled>Wait…</button>
+    <p id="footnote">The break must finish before you continue.</p>
   </main>
+  <script src="breaks-common.js"></script>
   <script src="break.js"></script>
 </body>
 </html>

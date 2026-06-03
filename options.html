@@ -64,6 +64,42 @@
     <span id="status"></span>
   </footer>
 
+  <section>
+    <h2>Break activities</h2>
+    <p class="help">Predefine what you might do on a break. When a break starts you'll pick up to 3 of these (or add new ones on the spot). Drag the handle to reorder.</p>
+    <div id="activities-list"></div>
+    <div class="activity-add-row">
+      <input id="new-activity-name" type="text" placeholder="activity name" autocomplete="off" />
+      <input id="new-activity-tag" type="text" placeholder="area / tag" autocomplete="off" />
+      <button id="add-activity" class="primary">add</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>Break stats</h2>
+    <p class="help">What you reach for on breaks.</p>
+    <div class="stats-block">
+      <div class="stats-title">Favourites</div>
+      <div id="stats-favourites"></div>
+    </div>
+    <div class="stats-block">
+      <div class="stats-title">Least chosen</div>
+      <div id="stats-least"></div>
+    </div>
+    <div class="stats-block">
+      <div class="stats-title">By area</div>
+      <div id="stats-pie"></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="breaks-head">
+      <h2>All breaks</h2>
+      <span id="breaks-count" class="breaks-count">0 logged</span>
+    </div>
+    <div id="breaks-list"></div>
+  </section>
+
   <template id="group-template">
     <div class="group" data-id="">
       <div class="group-head">
@@ -96,6 +132,7 @@
     </div>
   </template>
 
+  <script src="breaks-common.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

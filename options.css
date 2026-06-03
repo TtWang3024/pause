@@ -323,3 +323,280 @@ footer {
   color: var(--muted);
   font-size: 13px;
 }
+
+/* ===== Break activities ===== */
+.activity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.activity-row.dragging {
+  opacity: 0.5;
+}
+
+.drag-handle {
+  cursor: grab;
+  color: rgba(0, 0, 0, 0.35);
+  font-size: 16px;
+  line-height: 1;
+  user-select: none;
+}
+
+.act-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.act-tag {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.act-count {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: #555;
+  min-width: 28px;
+  text-align: right;
+}
+
+.act-date {
+  font-size: 13px;
+  color: #555;
+  min-width: 48px;
+  text-align: right;
+}
+
+.act-edit,
+.break-edit {
+  font-size: 13px;
+  padding: 5px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(0, 0, 0, 0.12);
+}
+
+.act-delete,
+.break-delete {
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 9px;
+  color: var(--danger);
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(185, 28, 28, 0.35);
+}
+
+.act-save,
+.act-cancel {
+  font-size: 13px;
+  padding: 5px 10px;
+  background: #fff;
+}
+
+.activity-row .edit-name {
+  flex: 1;
+  font-size: 14px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.activity-row .edit-tag {
+  width: 110px;
+  font-size: 13px;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
+
+.activity-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#new-activity-name {
+  flex: 1;
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+#new-activity-tag {
+  width: 160px;
+  font-size: 14px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* ===== Break stats ===== */
+.stats-block {
+  margin-bottom: 18px;
+}
+
+.stats-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.stat-line {
+  font-size: 14px;
+  margin-bottom: 3px;
+}
+
+.stat-line.muted {
+  color: var(--muted);
+}
+
+.stat-num {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pie-wrap {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.legend {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.swatch {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid;
+}
+
+/* ===== All breaks history ===== */
+.breaks-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.breaks-count {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.break-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fcfcfc;
+}
+
+.break-when {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: #555;
+  white-space: nowrap;
+}
+
+.break-dur {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 28px;
+}
+
+.break-acts {
+  flex: 1;
+  font-size: 14px;
+  word-break: break-word;
+}
+
+.break-row.editing {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.break-meta {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.break-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.break-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.break-chip .ct {
+  color: var(--muted);
+}
+
+.chip-x {
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--danger);
+}
+
+.break-edit-add {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.break-add-select {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 5px 7px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+}
