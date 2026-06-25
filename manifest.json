@@ -30,7 +30,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["pause.html", "break.html"],
+      "resources": ["commit.html", "pause.html", "break.html"],
       "matches": ["<all_urls>"]
     }
   ]

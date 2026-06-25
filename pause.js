@@ -1,6 +1,7 @@
 const params = new URLSearchParams(location.search);
 const targetUrl = params.get("url");
 const groupId = params.get("group");
+const breakParam = params.get("break"); // per-session break minutes from the commitment screen
 
 const timerEl = document.getElementById("timer");
 const hintEl = document.getElementById("hint");
@@ -82,8 +83,9 @@ function stopHold() {
 async function onComplete() {
   hintEl.textContent = "Going there now…";
   try {
-    const hostname = new URL(targetUrl).hostname.toLowerCase();
-    await chrome.runtime.sendMessage({ type: "grantAllowance", hostname });
+    const breakMinutes = breakParam != null ? parseInt(breakParam, 10) : undefined;
+    // Allowance is shared across the whole group, so signal by group id.
+    await chrome.runtime.sendMessage({ type: "grantAllowance", groupId, breakMinutes });
   } catch (e) {}
   location.replace(targetUrl);
 }

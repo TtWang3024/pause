@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Commit to a break</title>
+  <link rel="stylesheet" href="commit.css" />
+</head>
+<body>
+  <main id="stage">
+    <p id="lead">Once I finish this session,<br />I will take a break for</p>
+
+    <div id="readout">
+      <input id="mins" type="text" inputmode="numeric" autocomplete="off" aria-label="Break length in minutes" />
+      <span id="unit">min</span>
+    </div>
+
+    <div id="slider">
+      <div id="track" title="Drag, or scroll right / left">
+        <div id="fill"></div>
+        <div id="ticks"></div>
+        <div id="handle"></div>
+      </div>
+      <div id="scale"></div>
+    </div>
+
+    <button id="continue-btn" class="continue" type="button">Continue →</button>
+    <p id="hint">Drag the bar, scroll any direction, or type — then continue.</p>
+    <p id="target"></p>
+  </main>
+  <script src="commit.js"></script>
+</body>
+</html>

@@ -20,12 +20,30 @@ const DEFAULT_SETTINGS = {
   allowanceMinutes: 5,
   resetOnRelease: false,
   forceBreak: false,
-  breakMinutes: 3,
   breakMessage: "Step away from the screen. Stretch. Breathe."
 };
 
+const BREAK_MIN = 1;
+const BREAK_MAX = 30;
+
+const COMMIT_PAGE = chrome.runtime.getURL("commit.html");
 const PAUSE_PAGE = chrome.runtime.getURL("pause.html");
 const BREAK_PAGE = chrome.runtime.getURL("break.html");
+
+function clampBreakMinutes(n) {
+  n = Math.round(Number(n));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(BREAK_MIN, Math.min(BREAK_MAX, n));
+}
+
+// The screen that starts the gate: the commitment screen when a break is
+// enforced (so the user pre-commits to a break length), else the pause page.
+function entryUrl(targetUrl, groupId, forceBreak) {
+  const base = forceBreak ? COMMIT_PAGE : PAUSE_PAGE;
+  return base +
+    "?url=" + encodeURIComponent(targetUrl) +
+    "&group=" + encodeURIComponent(groupId);
+}
 
 async function getSettings() {
   const { settings } = await chrome.storage.sync.get("settings");
@@ -96,107 +114,115 @@ function parseHM(s) {
   return h * 60 + mm;
 }
 
-// State per hostname: { allowanceEnd, breakEnd }
-async function getHostState(hostname) {
-  const { hostStates = {} } = await chrome.storage.local.get("hostStates");
-  return hostStates[hostname] || null;
+// State per GROUP (shared by all sites in the group): { allowanceEnd, breakEnd, breakMinutes }
+async function getGroupState(groupId) {
+  const { groupStates = {} } = await chrome.storage.local.get("groupStates");
+  return groupStates[groupId] || null;
 }
 
-async function setHostState(hostname, state) {
-  const { hostStates = {} } = await chrome.storage.local.get("hostStates");
-  if (state) hostStates[hostname] = state;
-  else delete hostStates[hostname];
-  await chrome.storage.local.set({ hostStates });
+async function setGroupState(groupId, state) {
+  const { groupStates = {} } = await chrome.storage.local.get("groupStates");
+  if (state) groupStates[groupId] = state;
+  else delete groupStates[groupId];
+  await chrome.storage.local.set({ groupStates });
 }
 
-async function grantAllowance(hostname, settings) {
+// breakMinutesOverride is the per-session value committed on the commitment
+// screen; falls back to the settings default when absent.
+async function grantAllowance(groupId, settings, breakMinutesOverride) {
   const now = Date.now();
   const allowanceEnd = now + settings.allowanceMinutes * 60 * 1000;
+  const committed = clampBreakMinutes(breakMinutesOverride);
+  const breakMinutes = committed != null ? committed : BREAK_MAX;
   const breakEnd = settings.forceBreak
-    ? allowanceEnd + settings.breakMinutes * 60 * 1000
+    ? allowanceEnd + breakMinutes * 60 * 1000
     : allowanceEnd;
-  await setHostState(hostname, { allowanceEnd, breakEnd });
-  // Wake up at allowanceEnd to actively re-block any open tabs.
-  await scheduleExpireAlarm(hostname);
+  await setGroupState(groupId, { allowanceEnd, breakEnd, breakMinutes });
+  // Wake up at allowanceEnd to actively re-block the whole group's open tabs.
+  await scheduleExpireAlarm(groupId);
 }
 
-// Schedules the next "this hostname's state changes" alarm.
-async function scheduleExpireAlarm(hostname) {
-  const state = await getHostState(hostname);
+// Schedules the next "this group's state changes" alarm.
+async function scheduleExpireAlarm(groupId) {
+  const state = await getGroupState(groupId);
   if (!state) {
-    await chrome.alarms.clear("expire:" + hostname);
+    await chrome.alarms.clear("expire:" + groupId);
     return;
   }
   const now = Date.now();
   let when;
   if (now < state.allowanceEnd) when = state.allowanceEnd;
   else if (now < state.breakEnd) when = state.breakEnd;
-  else { await chrome.alarms.clear("expire:" + hostname); return; }
-  await chrome.alarms.create("expire:" + hostname, { when });
+  else { await chrome.alarms.clear("expire:" + groupId); return; }
+  await chrome.alarms.create("expire:" + groupId, { when });
 }
 
-// Find every open http(s) tab on this exact hostname and redirect them.
-async function redirectTabsOnHost(hostname, makeRedirectUrl) {
+// Find every open http(s) tab whose URL matches any site rule in the group
+// and redirect them — so the whole group blocks (or unblocks) together.
+async function redirectTabsInGroup(group, makeRedirectUrl) {
+  if (!group) return;
   const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
   for (const tab of tabs) {
-    try {
-      const u = new URL(tab.url);
-      if (u.hostname.toLowerCase() === hostname) {
-        chrome.tabs.update(tab.id, { url: makeRedirectUrl(tab.url) });
-      }
-    } catch {}
+    if (!tab.url) continue;
+    if (group.sites.some((site) => urlMatchesRule(tab.url, site))) {
+      chrome.tabs.update(tab.id, { url: makeRedirectUrl(tab.url) });
+    }
   }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (!alarm.name.startsWith("expire:")) return;
-  const hostname = alarm.name.slice("expire:".length);
-  const state = await getHostState(hostname);
-  if (!state) return;
+  const groupId = alarm.name.slice("expire:".length);
+  const state = await getGroupState(groupId);
+  if (!state) {
+    await chrome.alarms.clear("expire:" + groupId);
+    return;
+  }
   const now = Date.now();
   const settings = await getSettings();
+  const group = settings.groups.find((g) => g.id === groupId);
+  if (!group) {
+    // Group was deleted — clean up.
+    await setGroupState(groupId, null);
+    await chrome.alarms.clear("expire:" + groupId);
+    return;
+  }
 
   if (now < state.allowanceEnd) {
     // Fired too early (clock skew or fast-forward); just reschedule.
-    await scheduleExpireAlarm(hostname);
+    await scheduleExpireAlarm(groupId);
     return;
   }
   if (now < state.breakEnd) {
-    // Allowance just ended → kick tabs into the break page, then schedule the break-end alarm.
-    const bg = findGroupForUrl("https://" + hostname + "/", settings.groups);
-    const bgId = bg ? bg.id : "";
-    await redirectTabsOnHost(hostname, (url) =>
+    // Allowance just ended → kick the whole group into the break page, then schedule the break-end alarm.
+    await redirectTabsInGroup(group, (url) =>
       BREAK_PAGE + "?url=" + encodeURIComponent(url) +
       "&end=" + state.breakEnd +
-      "&group=" + encodeURIComponent(bgId)
+      "&group=" + encodeURIComponent(groupId) +
+      "&mins=" + (state.breakMinutes || "")
     );
-    await chrome.alarms.create("expire:" + hostname, { when: state.breakEnd });
+    await chrome.alarms.create("expire:" + groupId, { when: state.breakEnd });
     return;
   }
-  // Break is over (or there was none) → kick tabs back through the pause page.
-  // We pass an empty group id; pause.js falls back to the global default seconds.
-  const group = findGroupForUrl("https://" + hostname + "/", settings.groups);
-  const groupId = group ? group.id : "";
-  await redirectTabsOnHost(hostname, (url) =>
-    PAUSE_PAGE + "?url=" + encodeURIComponent(url) + "&group=" + encodeURIComponent(groupId)
-  );
-  await setHostState(hostname, null);
-  await chrome.alarms.clear("expire:" + hostname);
+  // Break is over (or there was none) → kick the whole group back to the entry
+  // screen (commitment screen when a break is enforced, else the pause page).
+  await redirectTabsInGroup(group, (url) => entryUrl(url, groupId, settings.forceBreak));
+  await setGroupState(groupId, null);
+  await chrome.alarms.clear("expire:" + groupId);
 });
 
 chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
-  if (url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
+  if (url.startsWith(COMMIT_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
 
   const settings = await getSettings();
   const group = findGroupForUrl(url, settings.groups);
   if (!group) return;
   if (!scheduleActiveNow(group.schedule)) return;
 
-  const hostname = new URL(url).hostname.toLowerCase();
-  const state = await getHostState(hostname);
+  const state = await getGroupState(group.id);
   const now = Date.now();
 
   if (state && now < state.allowanceEnd) return;
@@ -204,20 +230,18 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     const redirect = BREAK_PAGE +
       "?url=" + encodeURIComponent(url) +
       "&end=" + state.breakEnd +
-      "&group=" + encodeURIComponent(group.id);
+      "&group=" + encodeURIComponent(group.id) +
+      "&mins=" + (state.breakMinutes || "");
     chrome.tabs.update(details.tabId, { url: redirect });
     return;
   }
-  const redirect = PAUSE_PAGE +
-    "?url=" + encodeURIComponent(url) +
-    "&group=" + encodeURIComponent(group.id);
-  chrome.tabs.update(details.tabId, { url: redirect });
+  chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.forceBreak) });
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
-  if (msg?.type === "grantAllowance" && msg.hostname) {
+  if (msg?.type === "grantAllowance" && msg.groupId) {
     getSettings().then(async (settings) => {
-      await grantAllowance(msg.hostname, settings);
+      await grantAllowance(msg.groupId, settings, msg.breakMinutes);
       sendResponse({ ok: true });
     });
     return true;

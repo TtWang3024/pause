@@ -1,0 +1,188 @@
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal;
+  font-weight: 400 800;
+  font-display: swap;
+  src: url('fonts/Baloo2.woff2') format('woff2-variations');
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Baloo 2', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+}
+
+body {
+  background: #000;
+  color: #fff;
+}
+
+body.theme-white {
+  background: #fff;
+  color: #000;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  text-align: center;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+#lead {
+  margin: 0;
+  font-size: clamp(22px, 3.6vw, 38px);
+  font-weight: 500;
+  line-height: 1.35;
+  opacity: 0.92;
+}
+
+#readout {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+#mins {
+  font-family: inherit;
+  font-weight: 600;
+  font-size: clamp(60px, 13vw, 120px);
+  line-height: 1;
+  width: 2.4ch;
+  text-align: center;
+  background: transparent;
+  color: inherit;
+  border: none;
+  padding: 0;
+  caret-color: currentColor;
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+#mins:focus {
+  outline: none;
+  border-bottom: 3px solid currentColor;
+}
+
+#unit {
+  font-size: 22px;
+  opacity: 0.55;
+}
+
+/* Horizontal kitchen-timer length bar */
+#slider {
+  width: min(72vw, 560px);
+  margin-top: 4px;
+}
+
+#track {
+  position: relative;
+  height: 30px;
+  border-radius: 999px;
+  background: rgba(128, 128, 128, 0.22);
+  cursor: pointer;
+  touch-action: none;
+}
+
+#fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-radius: 999px;
+  background: #6aa3ff;
+  pointer-events: none;
+}
+
+#ticks {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.tick {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 12px;
+  margin-left: -1px;
+  transform: translateY(-50%);
+  background: currentColor;
+  opacity: 0.28;
+}
+
+#handle {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  margin-left: -15px;
+  transform: translateY(-50%);
+  border-radius: 50%;
+  background: #fff;
+  border: 3px solid #6aa3ff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+#scale {
+  position: relative;
+  height: 18px;
+  margin-top: 8px;
+}
+
+.scale-label {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  font-size: 12px;
+  opacity: 0.45;
+  font-variant-numeric: tabular-nums;
+}
+
+.continue {
+  margin-top: 8px;
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 18px;
+  padding: 12px 32px;
+  border-radius: 999px;
+  cursor: pointer;
+  background: #6aa3ff;
+  border: 1.5px solid #6aa3ff;
+  color: #fff;
+  transition: filter 0.15s ease;
+}
+
+.continue:hover {
+  filter: brightness(1.05);
+}
+
+#hint {
+  margin: 0;
+  font-size: 14px;
+  opacity: 0.5;
+  max-width: 38ch;
+}
+
+#target {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.4;
+  max-width: 80vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

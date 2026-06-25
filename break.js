@@ -2,8 +2,10 @@ const params = new URLSearchParams(location.search);
 const targetUrl = params.get("url");
 const breakEnd = parseInt(params.get("end"), 10);
 const groupId = params.get("group") || "";
+const minsParam = parseInt(params.get("mins"), 10);
 
 const messageEl = document.getElementById("message");
+const echoEl = document.getElementById("chosen-echo");
 const cornerEl = document.getElementById("corner-timer");
 const listEl = document.getElementById("activity-list");
 const pickHintEl = document.getElementById("pick-hint");
@@ -155,10 +157,13 @@ async function onDone() {
     activities: Array.from(selected.values())
   });
   await saveBreakLog(log);
-  const pauseUrl = chrome.runtime.getURL("pause.html") +
+  // Restart the cycle: re-commit to a fresh break when breaks are enforced,
+  // otherwise go straight to the pause page.
+  const entry = settings?.forceBreak ? "commit.html" : "pause.html";
+  const nextUrl = chrome.runtime.getURL(entry) +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId);
-  location.replace(pauseUrl);
+  location.replace(nextUrl);
 }
 
 doneBtn.addEventListener("click", onDone);
@@ -171,7 +176,11 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   if (settings) {
     applyBackground(settings.background);
     messageEl.textContent = settings.breakMessage || "Take a break.";
-    durationMin = settings.breakMinutes || 0;
+  }
+  // The committed length comes from the URL; fall back to the max if absent.
+  durationMin = Number.isFinite(minsParam) ? minsParam : 30;
+  if (durationMin > 0) {
+    echoEl.textContent = `You chose a ${durationMin}-minute break.`;
   }
   activities = await ensureSeededActivities();
   updateHint();
