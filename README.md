@@ -1,6 +1,6 @@
 # Hold to Pause
 
-A Chrome extension that makes you stop and think before opening time-sink websites. Instead of blocking you outright, it shows a full-screen countdown — and the countdown only ticks while you hold the left mouse button. Let go and the timer freezes (or resets, your choice).
+A Chrome extension that makes you stop and think before opening time-sink websites. Instead of blocking you outright, it adds friction at the moment of impulse: a full-screen countdown that **only ticks while you hold the left mouse button**. Optionally, you **pre-commit to a break** before each session and **take that break** afterward — a small, in-the-moment decision instead of a rigid schedule.
 
 ## Install (unpacked)
 
@@ -11,35 +11,70 @@ A Chrome extension that makes you stop and think before opening time-sink websit
 
 ## How it works
 
+With **Force a break** on (the full experience):
+
 ```
-Visit blocked site
+Visit a blocked site
         ↓
-  [ Pause page ]   ← hold left-click to count down
+[ Commit screen ]   ← "Once I finish this session, I will take a break for X min"
+        ↓               set X by drag / scroll / type — opens at 30 each time
+[ Pause page ]      ← hold left-click to count down
         ↓
-   Allowance       ← 5–25 min of free access on that domain
+   Allowance        ← 5–25 min of free access, SHARED across the whole group
         ↓
-   (optional)
-  [ Break page ]   ← 1–10 min forced cool-down with your custom message
+[ Break page ]      ← runs for the committed X minutes; pick up to 3 activities
         ↓
-  Back to Pause page on next visit
+  Next visit → back to the Commit screen (re-commit)
 ```
+
+With **Force a break** off: `blocked site → Pause page → Allowance → (no break) → Pause again`.
 
 The pause only fires when the group's **schedule** is active (day-of-week + optional time window).
 
+## Groups share one session
+
+Sites are organized into **groups**, and a group is treated as a single session:
+
+- Unlock **any** site in a group → the **whole group** opens for the allowance.
+- When the allowance (and break) end → **every open tab in the group re-blocks together**.
+
+So if `youtube.com` and `reddit.com` are in one group, completing the pause once frees both, and the limit ends for both at the same time.
+
+## The commitment screen
+
+Shown before the hold-to-countdown **when Force a break is on**:
+
+> *"Once I finish this session, I will take a break for **[X]** minutes."*
+
+Set the length (1–30 min) however you like — it **always opens at 30** (the max) and never remembers your last value, so doing nothing commits you to the longest break and nudges a deliberate choice:
+
+- **Drag** the horizontal bar (precise).
+- **Scroll** — a slow scroll moves proportionally (short = one 5-min interval, longer = two); a fast flick sweeps to the end.
+- **Type** a number, or use **↑ / ↓** arrow keys.
+
+**Continue →** advances to the hold-to-countdown. The break afterward runs for exactly the minutes you committed, and the break screen echoes *"You chose an X-minute break."*
+
+## Break activities
+
+Make your break intentional instead of idle:
+
+- **Predefine activities** in Settings — each has a name and an area/tag (e.g. `🧠body`, `👁eye`). Add, inline-edit, delete, and drag to reorder. A sensible starter set is seeded on first run.
+- **During a break**, pick **up to 3** (or add a new one on the spot with **+**, which saves to your list).
+- **Break stats** — Favourites, Least chosen, and a "By area" pie chart, all derived from your history.
+- **All breaks** — a history log; edit (add/remove activities) or delete any entry. Counts and stats recompute automatically.
+
 ## Two ways to add blocked sites
 
-### Via the toolbar popup
-Click the extension's icon in the Chrome toolbar to get a small popup:
+### Toolbar popup
+Click the extension's icon for a quick popup:
 
-- Shows the current tab's URL
-- Dropdown to pick which group to add to (remembers your last choice)
-- **Block this domain** — adds the hostname (e.g. `youtube.com`), covers all paths
-- **Block this section** — pre-fills the first two path segments (e.g. `youtube.com/shorts`); you can edit the text before clicking the button
-- Cog icon (top-right) → opens the full settings page
-- Buttons show ✓ when the rule already exists in the selected group
+- Shows the current tab's URL and a group dropdown (remembers your last choice).
+- **Block this domain** — adds the hostname (e.g. `youtube.com`), covers all paths.
+- **Block this section** — pre-fills the first two path segments (e.g. `youtube.com/shorts`); editable before you add.
+- Cog (top-right) → full settings page. Buttons show ✓ when the rule already exists.
 
-### Via the settings page
-Open the cog from the popup, or right-click the extension icon → Options. Add domains directly to a group's text area, one per line.
+### Settings page
+Add domains directly to a group's text area, one per line.
 
 ## Site rule syntax
 
@@ -54,50 +89,34 @@ Path matching is boundary-safe: `reddit.com/r/fun` will **not** accidentally mat
 
 ## Settings
 
-All settings live in the options page (popup cog icon, or `chrome://extensions` → Hold to Pause → Details → Extension options).
+All settings live in the options page (popup cog, or `chrome://extensions` → Hold to Pause → Details → Extension options).
 
-### Groups
-Each group has:
-- **Name**
-- **Sites** — one per line, supports domains and `domain/path` rules
-- **Pause seconds** — how long you need to hold for this group's sites
-- **Schedule** — day-of-week (Mon–Sun toggles, default all on) and optional start/end time window (leave empty for all-day; window can wrap midnight)
-
-Add as many groups as you want; each has its own timing and schedule.
-
-### Countdown behavior
-- **Reset timer on release** (on/off) — when you let go mid-countdown, choose whether the timer pauses where it is or snaps back to full.
-
-### Pause page background
-- **Black**, **white**, or a **custom color** (hex picker). Text color flips automatically based on background luminance.
-
-### Allowance
-- **5–25 minutes** of free access on a domain after you complete a pause. Prevents every internal click from re-triggering the pause page.
-
-### Forced break (optional)
-- When **on**, the cycle goes pause → allowance → break instead of pause → allowance → pause.
-- **Break length:** 1–10 minutes.
-- **Break message:** custom text shown in the middle of the break page.
-- A small `MM:SS` countdown sits in the top-right corner. When it hits zero, you're sent back through the pause page.
+- **Groups** — name, sites (one per line; domains and `domain/path` rules), **pause seconds**, and a **schedule** (Mon–Sun toggles + optional start/end time window; window can wrap midnight).
+- **Countdown behavior** — *Reset timer on release* (pause where it is, or snap back to full).
+- **Pause page background** — black, white, or a custom hex color (text color flips by luminance).
+- **After completing a pause** — the **allowance** (5–25 min), and the **Force a break** toggle with a custom **break-screen message**. (Break *length* isn't here — it's chosen on the commitment screen each session.)
+- **Break activities**, **Break stats**, **All breaks** — described above (these save on their own; the **Save** button covers the rest).
 
 ## Files
 
 | File | Purpose |
 |---|---|
 | `manifest.json` | Extension manifest (MV3) |
-| `background.js` | Service worker — intercepts navigation, manages allowance/break/schedule logic |
+| `background.js` | Service worker — intercepts navigation, routes to commit/pause/break, per-group allowance/break/schedule logic |
+| `commit.html` / `commit.css` / `commit.js` | Pre-break commitment screen (the break-length setter) |
 | `pause.html` / `pause.css` / `pause.js` | Hold-to-countdown page |
-| `break.html` / `break.css` / `break.js` | Forced-break page with corner timer |
+| `break.html` / `break.css` / `break.js` | Break page — corner timer, echo, activity picker |
 | `popup.html` / `popup.css` / `popup.js` | Toolbar popup for quick block-from-current-tab |
 | `options.html` / `options.css` / `options.js` | Settings UI |
-| `fonts/Baloo2.woff2` | Display font for the timer and headings |
-| `fonts/Figtree.woff2` | Body font for the settings and popup |
+| `breaks-common.js` | Shared helpers for break activities, stats, history, tag colors |
+| `fonts/Baloo2.woff2`, `fonts/Figtree.woff2` | Bundled display + body fonts (SIL OFL) |
 | `icons/icon-{16,32,48,128}.png` | Toolbar / extensions-page / install-dialog icons |
 
 ## Notes & limitations
 
-- Settings sync across signed-in Chrome installs via `chrome.storage.sync`.
-- Allowance/break state and last-used group are device-local (`chrome.storage.local`).
-- Closing or reloading the break-page tab does **not** end the break early — state is tracked per-domain.
+- Settings and break activities sync across signed-in Chrome installs (`chrome.storage.sync`).
+- Allowance/break state, break history, and last-used group are device-local (`chrome.storage.local`).
+- Allowance/break state is keyed **per group**, not per domain.
+- Closing or reloading the break-page tab does **not** end the break early — state is tracked per group.
 - Site matching is hostname + optional path-prefix. No regex or wildcard support yet.
 - Fonts are bundled (Baloo 2, Figtree) under SIL OFL — no network access needed at runtime.
