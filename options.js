@@ -117,7 +117,7 @@ saveBtn.addEventListener("click", async () => {
   const settings = {
     groups: readGroups(),
     background: readBackground(),
-    allowanceMinutes: clampInt(allowanceEl.value, 5, 25, 5),
+    allowanceMinutes: clampInt(allowanceEl.value, 3, 25, 5),
     resetOnRelease: resetOnReleaseEl.checked,
     forceBreak: forceBreakEl.checked,
     breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage
@@ -132,7 +132,7 @@ saveBtn.addEventListener("click", async () => {
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   s.groups.forEach(renderGroup);
   applyBackgroundUI(s.background);
-  allowanceEl.value = Math.min(25, Math.max(5, s.allowanceMinutes ?? 5));
+  allowanceEl.value = Math.min(25, Math.max(3, s.allowanceMinutes ?? 5));
   resetOnReleaseEl.checked = !!s.resetOnRelease;
   forceBreakEl.checked = !!s.forceBreak;
   breakMessageEl.value = s.breakMessage ?? DEFAULT_SETTINGS.breakMessage;

@@ -3,6 +3,7 @@ const targetUrl = params.get("url");
 const groupId = params.get("group") || "";
 
 const stageEl = document.getElementById("stage");
+const sessionEl = document.getElementById("session");
 const minsEl = document.getElementById("mins");
 const trackEl = document.getElementById("track");
 const fillEl = document.getElementById("fill");
@@ -13,16 +14,23 @@ const continueBtn = document.getElementById("continue-btn");
 const hintEl = document.getElementById("hint");
 const targetEl = document.getElementById("target");
 
-const MIN = 1;
-const MAX = 30;
-const SCROLL_INTERVAL = 5; // scroll snaps to 5-minute marks
-const STEP_PX = 100;       // pixels of accumulated scroll per 5-min interval (lower = more sensitive)
-const SCROLL_GAP = 400;    // ms; a pause this long drops leftover scroll distance
+// Break length: discrete levels. Drag and scroll snap to these; typing / arrow
+// keys stay free (any 1–30) for precision.
+const LEVELS = [1, 3, 5, 10, 15, 20, 25, 30];
+const MIN = LEVELS[0];
+const MAX = LEVELS[LEVELS.length - 1];
+const STEP_PX = 100;    // pixels of accumulated scroll per level step (lower = more sensitive)
+const SCROLL_GAP = 400; // ms; a pause this long drops leftover scroll distance
 let value = MAX;
 let wheelAccum = 0;
 let lastWheelAt = -100000;
 let lastWheelDir = 0;
 let dragging = false;
+
+// Session (allowance) length: typed only, defaults to the settings allowance.
+const SESSION_MIN = 3;
+const SESSION_MAX = 25;
+let sessionValue = SESSION_MAX;
 
 function applyBackground(bg) {
   if (!bg) return;
@@ -49,6 +57,12 @@ function clamp(n) {
   return Math.max(MIN, Math.min(MAX, n));
 }
 
+function nearestLevel(v) {
+  let best = LEVELS[0];
+  for (const L of LEVELS) if (Math.abs(L - v) < Math.abs(best - v)) best = L;
+  return best;
+}
+
 // Bar length is proportional to minutes (full track = MAX).
 function paint() {
   const pct = (value / MAX) * 100;
@@ -73,40 +87,42 @@ function nudge(delta) {
   setValue((Number.isFinite(cur) ? cur : value) + delta);
 }
 
-// Scroll jumps to the next / previous 5-minute mark (drag and type stay 1-min).
+// Scroll moves to the next / previous discrete level.
 function scrollStep(dir) {
-  const cur = parseInt(minsEl.value, 10);
-  const v = Number.isFinite(cur) ? cur : value;
-  const next = dir > 0
-    ? Math.floor(v / SCROLL_INTERVAL) * SCROLL_INTERVAL + SCROLL_INTERVAL
-    : Math.ceil(v / SCROLL_INTERVAL) * SCROLL_INTERVAL - SCROLL_INTERVAL;
-  setValue(next);
+  if (dir > 0) {
+    const next = LEVELS.find((L) => L > value);
+    setValue(next != null ? next : MAX);
+  } else {
+    const below = [...LEVELS].reverse().find((L) => L < value);
+    setValue(below != null ? below : MIN);
+  }
 }
 
 function buildScale() {
-  for (let m = 5; m <= MAX; m += 5) {
-    const pct = (m / MAX) * 100;
+  for (const L of LEVELS) {
+    const pct = (L / MAX) * 100;
     const tick = document.createElement("div");
     tick.className = "tick";
     tick.style.left = pct + "%";
     ticksEl.appendChild(tick);
-
-    const label = document.createElement("span");
-    label.className = "scale-label";
-    label.style.left = pct + "%";
-    label.textContent = String(m);
-    scaleEl.appendChild(label);
+    if (L !== MIN) { // skip the 1-min label — it sits at the very edge
+      const label = document.createElement("span");
+      label.className = "scale-label";
+      label.style.left = pct + "%";
+      label.textContent = String(L);
+      scaleEl.appendChild(label);
+    }
   }
 }
 
+// Drag snaps to the nearest level.
 function valueFromClientX(clientX) {
   const rect = trackEl.getBoundingClientRect();
   let frac = (clientX - rect.left) / rect.width;
   frac = Math.max(0, Math.min(1, frac));
-  return clamp(frac * MAX);
+  return nearestLevel(clamp(frac * MAX));
 }
 
-// Drag anywhere on the track to set the length.
 trackEl.addEventListener("pointerdown", (e) => {
   dragging = true;
   try { trackEl.setPointerCapture(e.pointerId); } catch {}
@@ -121,8 +137,9 @@ trackEl.addEventListener("pointerup", (e) => {
 });
 trackEl.addEventListener("pointercancel", () => { dragging = false; });
 
-// Dampened scroll anywhere on the screen: right = longer, left = shorter
-// (vertical wheel falls back, up = longer).
+// Proportional scroll anywhere on the screen — momentum welcome: a fast flick
+// dumps a large total distance and sweeps the range, while a slow scroll moves
+// proportional to how far you drag. Each STEP_PX of distance = one level step.
 stageEl.addEventListener("wheel", (e) => {
   e.preventDefault();
   const now = e.timeStamp;
@@ -131,10 +148,6 @@ stageEl.addEventListener("wheel", (e) => {
   const delta = horizontal ? -e.deltaX : e.deltaY;
   const dir = delta > 0 ? 1 : (delta < 0 ? -1 : 0);
 
-  // Drop leftover distance after a real pause or a direction reversal so it
-  // doesn't bleed across gestures. Otherwise just accumulate — momentum is the
-  // feature: a fast flick dumps a large total distance and sweeps to the end,
-  // while a slow scroll moves proportional to how far you drag.
   if (now - lastWheelAt > SCROLL_GAP || (dir !== 0 && dir !== lastWheelDir)) wheelAccum = 0;
   lastWheelAt = now;
   if (dir !== 0) lastWheelDir = dir;
@@ -157,18 +170,41 @@ minsEl.addEventListener("keydown", (e) => {
   else if (e.key === "Enter") { e.preventDefault(); proceed(); }
 });
 
+// --- Session length (typed only) ---
+function clampSession(n) {
+  n = Math.round(Number(n));
+  if (!Number.isFinite(n)) return sessionValue;
+  return Math.max(SESSION_MIN, Math.min(SESSION_MAX, n));
+}
+function setSession(n) {
+  sessionValue = clampSession(n);
+  sessionEl.value = String(sessionValue);
+}
+sessionEl.addEventListener("input", () => {
+  const digits = sessionEl.value.replace(/\D/g, "").slice(0, 2);
+  if (sessionEl.value !== digits) sessionEl.value = digits;
+  const n = parseInt(digits, 10);
+  if (Number.isFinite(n)) sessionValue = n; // clamp on blur, not mid-type
+});
+sessionEl.addEventListener("blur", () => setSession(parseInt(sessionEl.value, 10)));
+sessionEl.addEventListener("keydown", (e) => {
+  if (e.key === "Enter") { e.preventDefault(); sessionEl.blur(); proceed(); }
+});
+
 continueBtn.addEventListener("click", proceed);
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && document.activeElement !== minsEl) proceed();
+  if (e.key === "Enter" && document.activeElement !== minsEl && document.activeElement !== sessionEl) proceed();
 });
 
 function proceed() {
   if (!targetUrl) return;
   setValue(parseInt(minsEl.value, 10));
+  setSession(parseInt(sessionEl.value, 10));
   const url = chrome.runtime.getURL("pause.html") +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId) +
-    "&break=" + value;
+    "&break=" + value +
+    "&session=" + sessionValue;
   location.replace(url);
 }
 
@@ -186,5 +222,6 @@ function proceed() {
     settings = await chrome.runtime.sendMessage({ type: "getSettings" });
   } catch (e) {}
   if (settings) applyBackground(settings.background);
-  setValue(MAX); // always opens at the maximum — no setting, no memory
+  setValue(MAX); // break always opens at the maximum — no setting, no memory
+  setSession(settings?.allowanceMinutes ?? SESSION_MAX); // session defaults to the settings allowance
 })();

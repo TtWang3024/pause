@@ -46,6 +46,28 @@ body.theme-white {
   opacity: 0.92;
 }
 
+.session-input {
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 700;
+  width: 2.2ch;
+  text-align: center;
+  background: transparent;
+  color: inherit;
+  border: none;
+  border-bottom: 2px solid currentColor;
+  padding: 0 2px 2px;
+  caret-color: currentColor;
+  font-variant-numeric: tabular-nums;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.session-input:focus {
+  outline: none;
+  border-bottom-width: 3px;
+}
+
 #readout {
   display: inline-flex;
   align-items: baseline;

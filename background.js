@@ -36,6 +36,14 @@ function clampBreakMinutes(n) {
   return Math.max(BREAK_MIN, Math.min(BREAK_MAX, n));
 }
 
+const ALLOW_MIN = 3;
+const ALLOW_MAX = 25;
+function clampAllowanceMinutes(n) {
+  n = Math.round(Number(n));
+  if (!Number.isFinite(n)) return null;
+  return Math.max(ALLOW_MIN, Math.min(ALLOW_MAX, n));
+}
+
 // The screen that starts the gate: the commitment screen when a break is
 // enforced (so the user pre-commits to a break length), else the pause page.
 function entryUrl(targetUrl, groupId, forceBreak) {
@@ -129,9 +137,11 @@ async function setGroupState(groupId, state) {
 
 // breakMinutesOverride is the per-session value committed on the commitment
 // screen; falls back to the settings default when absent.
-async function grantAllowance(groupId, settings, breakMinutesOverride) {
+async function grantAllowance(groupId, settings, breakMinutesOverride, allowanceMinutesOverride) {
   const now = Date.now();
-  const allowanceEnd = now + settings.allowanceMinutes * 60 * 1000;
+  const allow = clampAllowanceMinutes(allowanceMinutesOverride);
+  const allowanceMinutes = allow != null ? allow : settings.allowanceMinutes;
+  const allowanceEnd = now + allowanceMinutes * 60 * 1000;
   const committed = clampBreakMinutes(breakMinutesOverride);
   const breakMinutes = committed != null ? committed : BREAK_MAX;
   const breakEnd = settings.forceBreak
@@ -241,7 +251,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "grantAllowance" && msg.groupId) {
     getSettings().then(async (settings) => {
-      await grantAllowance(msg.groupId, settings, msg.breakMinutes);
+      await grantAllowance(msg.groupId, settings, msg.breakMinutes, msg.allowanceMinutes);
       sendResponse({ ok: true });
     });
     return true;

@@ -44,13 +44,13 @@ So if `youtube.com` and `reddit.com` are in one group, completing the pause once
 
 Shown before the hold-to-countdown **when Force a break is on**:
 
-> *"Once I finish this session, I will take a break for **[X]** minutes."*
+> *"Once I finish this **[N]** min session, I will take a break for **[X]** minutes."*
 
-Set the length (1–30 min) however you like — it **always opens at 30** (the max) and never remembers your last value, so doing nothing commits you to the longest break and nudges a deliberate choice:
-
-- **Drag** the horizontal bar (precise).
-- **Scroll** — a slow scroll moves proportionally (short = one 5-min interval, longer = two); a fast flick sweeps to the end.
-- **Type** a number, or use **↑ / ↓** arrow keys.
+- **Session length (N)** — your free-browsing time. **Type-only**, defaults to the Settings allowance, range **3–25**. Editing it sets the allowance for this session.
+- **Break length (X)** — the bar snaps to discrete levels **1, 3, 5, 10, 15, 20, 25, 30**. It **always opens at 30** (the max) and never remembers your last value, so doing nothing commits you to the longest break and nudges a deliberate choice. Set it by:
+  - **Drag** the bar (snaps to the nearest level).
+  - **Scroll** — a slow scroll steps level-by-level proportional to distance; a fast flick sweeps to the end.
+  - **Type** a number (any 1–30) or use **↑ / ↓** arrow keys for off-level precision.
 
 **Continue →** advances to the hold-to-countdown. The break afterward runs for exactly the minutes you committed, and the break screen echoes *"You chose an X-minute break."*
 
@@ -94,7 +94,7 @@ All settings live in the options page (popup cog, or `chrome://extensions` → H
 - **Groups** — name, sites (one per line; domains and `domain/path` rules), **pause seconds**, and a **schedule** (Mon–Sun toggles + optional start/end time window; window can wrap midnight).
 - **Countdown behavior** — *Reset timer on release* (pause where it is, or snap back to full).
 - **Pause page background** — black, white, or a custom hex color (text color flips by luminance).
-- **After completing a pause** — the **allowance** (5–25 min), and the **Force a break** toggle with a custom **break-screen message**. (Break *length* isn't here — it's chosen on the commitment screen each session.)
+- **After completing a pause** — the **allowance** (3–25 min; the *default* session length, editable each time on the commitment screen), and the **Force a break** toggle with a custom **break-screen message**. (Break *length* isn't here — it's chosen on the commitment screen each session.)
 - **Break activities**, **Break stats**, **All breaks** — described above (these save on their own; the **Save** button covers the rest).
 
 ## Files
