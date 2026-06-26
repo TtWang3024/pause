@@ -8,6 +8,13 @@
   "background": {
     "service_worker": "background.js"
   },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["reflect-content.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
@@ -30,7 +37,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["commit.html", "pause.html", "break.html"],
+      "resources": ["reflect.html", "commit.html", "pause.html", "break.html", "images/*"],
       "matches": ["<all_urls>"]
     }
   ]

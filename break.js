@@ -157,9 +157,9 @@ async function onDone() {
     activities: Array.from(selected.values())
   });
   await saveBreakLog(log);
-  // Restart the cycle: re-commit to a fresh break when breaks are enforced,
-  // otherwise go straight to the pause page.
-  const entry = settings?.forceBreak ? "commit.html" : "pause.html";
+  // Restart the cycle: re-enter via the reflection screen when breaks are
+  // enforced (reflect → commit → pause), otherwise straight to the pause page.
+  const entry = settings?.forceBreak ? "reflect.html" : "pause.html";
   const nextUrl = chrome.runtime.getURL(entry) +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId);

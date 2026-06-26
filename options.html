@@ -100,6 +100,23 @@
     <div id="breaks-list"></div>
   </section>
 
+  <section>
+    <h2>Reflections</h2>
+    <p class="help">Your "magic power" notes — thoughts, body, and mood — captured before each session and shown as a star map on the reflection screen.</p>
+    <div class="reflect-window">
+      Star map shows the last
+      <button class="rwin-btn" data-m="1" type="button">1 month</button>
+      <button class="rwin-btn" data-m="6" type="button">6 months</button>
+    </div>
+    <div class="reflect-subhead">Feelings (mood map)</div>
+    <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence–arousal circumplex. Add or remove any.</p>
+    <div id="feelings-editor"></div>
+    <div class="reflect-subhead">History
+      <span id="reflections-count" class="breaks-count">0 logged</span>
+    </div>
+    <div id="reflections-list"></div>
+  </section>
+
   <template id="group-template">
     <div class="group" data-id="">
       <div class="group-head">
@@ -133,6 +150,7 @@
   </template>
 
   <script src="breaks-common.js"></script>
+  <script src="reflections-common.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

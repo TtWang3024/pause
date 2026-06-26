@@ -1,0 +1,203 @@
+@font-face {
+  font-family: 'Baloo 2';
+  font-style: normal; font-weight: 400 800; font-display: swap;
+  src: url('fonts/Baloo2.woff2') format('woff2-variations');
+}
+@font-face {
+  font-family: 'Figtree';
+  font-style: normal; font-weight: 300 900; font-display: swap;
+  src: url('fonts/Figtree.woff2') format('woff2-variations');
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0; height: 100%; overflow: hidden;
+  font-family: 'Figtree', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  user-select: none;
+  cursor: none; /* the wand replaces the real cursor */
+}
+body { background: #04040a; color: #fff; }
+body.theme-white { background: #f3f4fb; color: #111; }
+
+#trail { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+#starmap { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
+
+.star, .star-dot {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: auto;
+}
+.star { object-fit: contain; }
+.star-dot {
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.5) 60%, rgba(255,255,255,0) 100%);
+}
+
+#tooltip {
+  position: fixed; z-index: 6; pointer-events: none;
+  max-width: 280px; padding: 8px 12px; border-radius: 10px;
+  background: rgba(20, 20, 30, 0.92); color: #fff;
+  font-size: 14px; line-height: 1.4;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+  transform: translate(-50%, calc(-100% - 14px));
+}
+#tooltip .tt-date { display: block; margin-top: 3px; font-size: 11px; opacity: 0.6; }
+#tooltip.hidden { display: none; }
+
+#window-toggle {
+  position: fixed; top: 18px; right: 20px; z-index: 4;
+  display: inline-flex; gap: 4px; pointer-events: auto;
+  background: rgba(128,128,128,0.18); border-radius: 999px; padding: 3px;
+}
+.win-btn {
+  font-family: inherit; font-size: 12px; padding: 5px 12px;
+  border: none; border-radius: 999px; background: transparent; color: inherit;
+  cursor: pointer; opacity: 0.7;
+}
+.win-btn.on { background: #6aa3ff; color: #fff; opacity: 1; }
+
+#stage {
+  position: fixed; inset: 0; z-index: 2; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: space-between;
+  padding: 40px 24px 28px; box-sizing: border-box; text-align: center;
+}
+
+#heading {
+  margin: 0; font-family: 'Baloo 2', sans-serif; font-weight: 500;
+  font-size: clamp(20px, 3.4vw, 34px); max-width: 22ch; opacity: 0.95;
+}
+
+#bottom {
+  pointer-events: auto;
+  display: flex; flex-direction: column; align-items: center; gap: 10px;
+}
+
+/* compose modal — hidden until a star is opened */
+#compose-overlay {
+  position: fixed; inset: 0; z-index: 3; display: none;
+  align-items: center; justify-content: center; padding: 24px;
+  background: rgba(0, 0, 0, 0.32);
+}
+#compose-overlay.open { display: flex; }
+body.theme-white #compose-overlay { background: rgba(255, 255, 255, 0.4); }
+
+#compose {
+  position: relative;
+  pointer-events: auto;
+  width: min(560px, 94vw);
+  max-height: 88vh; overflow-y: auto;
+  background: rgba(24, 24, 34, 0.93);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 22px 18px 18px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+  display: flex; flex-direction: column; gap: 14px;
+}
+body.theme-white #compose {
+  background: rgba(255, 255, 255, 0.97); color: #111; border-color: rgba(0, 0, 0, 0.1);
+}
+
+#compose-close {
+  position: absolute; top: 8px; right: 10px;
+  width: 30px; height: 30px; border-radius: 50%;
+  border: none; background: rgba(128, 128, 128, 0.25); color: inherit;
+  font-size: 18px; line-height: 1; cursor: pointer;
+}
+
+.field { text-align: left; }
+.field > label {
+  display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; opacity: 0.55; margin-bottom: 6px;
+}
+
+#thought-input, #body-input {
+  width: 100%; font-family: inherit; font-size: 14px; padding: 9px 11px;
+  border-radius: 8px; border: 1px solid rgba(128,128,128,0.4);
+  background: rgba(128,128,128,0.12); color: inherit; cursor: none;
+}
+#thought-input::placeholder, #body-input::placeholder { color: inherit; opacity: 0.4; }
+
+#thought-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+#thought-chips:empty { display: none; }
+
+.thought-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 13px; padding: 5px 6px 5px 11px; border-radius: 999px;
+  background: rgba(128,128,128,0.2);
+}
+.thought-chip .x {
+  font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 999px;
+  border: none; background: rgba(0,0,0,0.18); color: inherit; cursor: none;
+}
+
+/* Russell circumplex mood map */
+#circumplex { display: flex; flex-direction: column; gap: 4px; }
+.cx-axis { font-size: 11px; opacity: 0.5; text-align: center; }
+.cx-mid { display: flex; align-items: stretch; gap: 6px; }
+.cx-side { writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center; opacity: 0.5; font-size: 11px; }
+.cx-mid .cx-side:first-of-type { transform: rotate(180deg); }
+.cx-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cx-cell {
+  border-radius: 10px; padding: 8px; min-height: 78px;
+  display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; cursor: pointer;
+}
+.cx-cell[data-q="tl"] { background: #FAECE7; }
+.cx-cell[data-q="tr"] { background: #FAEEDA; }
+.cx-cell[data-q="bl"] { background: #E6F1FB; }
+.cx-cell[data-q="br"] { background: #EAF3DE; }
+.cx-chip {
+  font-family: inherit; font-size: 12px; padding: 4px 9px; border-radius: 999px;
+  background: #fff; border: 0.5px solid; cursor: pointer;
+}
+.cx-chip.on { color: #fff !important; }
+.cx-add {
+  font-family: inherit; font-size: 12px; padding: 4px 8px; border-radius: 999px;
+  border: 0.5px dashed currentColor; background: rgba(255,255,255,0.7); width: 10ch; color: inherit;
+}
+
+.continue {
+  align-self: center; margin-top: 2px;
+  font-family: inherit; font-weight: 600; font-size: 17px;
+  padding: 11px 30px; border-radius: 999px; cursor: pointer;
+  background: #6aa3ff; border: 1.5px solid #6aa3ff; color: #fff;
+}
+#hint { margin: 0; font-size: 12px; opacity: 0.5; text-align: center; }
+
+/* Over the compose form, use the normal OS cursor (not the wand) */
+#compose { cursor: default; }
+#compose input { cursor: text; }
+#compose button,
+#compose .cx-chip,
+#compose .thought-chip .x { cursor: pointer; }
+
+#wand {
+  position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
+  width: 250px; height: 250px; will-change: transform;
+}
+#wand.hidden, #twinkle.hidden { display: none; }
+
+/* the star you summon by shaking — click it to open the compose panel */
+.summon-star {
+  position: fixed; top: 50%; left: 50%; width: 90px; height: 90px; z-index: 4;
+  transform: translate(-50%, -50%) scale(0); cursor: pointer; pointer-events: auto;
+  animation: summon-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards,
+             summon-pulse 1.8s ease-in-out 0.4s infinite;
+}
+@keyframes summon-pop { to { transform: translate(-50%, -50%) scale(1); } }
+@keyframes summon-pulse {
+  0%, 100% { filter: drop-shadow(0 0 14px rgba(255, 220, 130, 0.85)); }
+  50%      { filter: drop-shadow(0 0 26px rgba(255, 235, 160, 1)); }
+}
+#twinkle {
+  position: fixed; top: 0; left: 0; z-index: 9998; pointer-events: none;
+  width: 26px; height: 26px; margin: -13px 0 0 -13px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,245,200,0.95) 0%, rgba(255,225,140,0.5) 45%, rgba(255,225,140,0) 75%);
+  will-change: transform, opacity;
+  animation: twinkle 1.6s ease-in-out infinite;
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.55; transform: var(--pos) scale(0.85); }
+  50%      { opacity: 1;    transform: var(--pos) scale(1.25); }
+}

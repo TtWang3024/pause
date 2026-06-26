@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
 const BREAK_MIN = 1;
 const BREAK_MAX = 30;
 
+const REFLECT_PAGE = chrome.runtime.getURL("reflect.html");
 const COMMIT_PAGE = chrome.runtime.getURL("commit.html");
 const PAUSE_PAGE = chrome.runtime.getURL("pause.html");
 const BREAK_PAGE = chrome.runtime.getURL("break.html");
@@ -44,10 +45,10 @@ function clampAllowanceMinutes(n) {
   return Math.max(ALLOW_MIN, Math.min(ALLOW_MAX, n));
 }
 
-// The screen that starts the gate: the commitment screen when a break is
-// enforced (so the user pre-commits to a break length), else the pause page.
+// The screen that starts the gate: when a break is enforced, the reflection
+// screen (→ commitment → pause); otherwise straight to the pause page.
 function entryUrl(targetUrl, groupId, forceBreak) {
-  const base = forceBreak ? COMMIT_PAGE : PAUSE_PAGE;
+  const base = forceBreak ? REFLECT_PAGE : PAUSE_PAGE;
   return base +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId);
@@ -225,7 +226,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
-  if (url.startsWith(COMMIT_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
+  if (url.startsWith(REFLECT_PAGE) || url.startsWith(COMMIT_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
 
   const settings = await getSettings();
   const group = findGroupForUrl(url, settings.groups);
@@ -258,6 +259,23 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg?.type === "getSettings") {
     getSettings().then((s) => sendResponse(s));
+    return true;
+  }
+  // Content script asks whether to show the on-site reflect wand: only while
+  // this page's group has an active allowance (free-browsing window).
+  if (msg?.type === "reflectIconCheck") {
+    (async () => {
+      try {
+        const settings = await getSettings();
+        const url = msg.url || (sender.tab && sender.tab.url) || "";
+        const group = findGroupForUrl(url, settings.groups);
+        if (!group) return sendResponse({ show: false });
+        const state = await getGroupState(group.id);
+        sendResponse({ show: !!(state && Date.now() < state.allowanceEnd) });
+      } catch (e) {
+        sendResponse({ show: false });
+      }
+    })();
     return true;
   }
 });

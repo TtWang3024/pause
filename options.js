@@ -408,3 +408,136 @@ saveBtn.addEventListener("click", async () => {
     renderAll();
   })();
 })();
+
+// ===== Reflections (history, mood palette, star-map window) =====
+(function reflectionsModule() {
+  const winButtons = document.querySelectorAll(".rwin-btn");
+  const feelingsEditor = document.getElementById("feelings-editor");
+  const reflectionsList = document.getElementById("reflections-list");
+  const reflectionsCount = document.getElementById("reflections-count");
+
+  const Q_LABELS = {
+    tl: "Unpleasant · high energy",
+    tr: "Pleasant · high energy",
+    bl: "Unpleasant · low energy",
+    br: "Pleasant · calm"
+  };
+
+  let feelings = {};
+  let log = [];
+  let windowMonths = 1;
+
+  function paintWindow() {
+    winButtons.forEach((b) => b.classList.toggle("on", parseInt(b.dataset.m, 10) === windowMonths));
+  }
+  winButtons.forEach((b) => b.addEventListener("click", async () => {
+    windowMonths = parseInt(b.dataset.m, 10);
+    await saveWindowMonths(windowMonths);
+    paintWindow();
+  }));
+
+  function renderFeelings() {
+    feelingsEditor.innerHTML = "";
+    for (const q of ["tl", "tr", "bl", "br"]) {
+      const meta = QUADRANT_META[q];
+      const block = document.createElement("div");
+      block.className = "feel-block";
+      block.style.background = meta.cell;
+      block.style.borderColor = meta.border;
+
+      const h = document.createElement("div");
+      h.className = "feel-q-label"; h.textContent = Q_LABELS[q]; h.style.color = meta.text;
+      block.appendChild(h);
+
+      const chips = document.createElement("div");
+      chips.className = "feel-chips";
+      (feelings[q] || []).forEach((name, i) => {
+        const pill = document.createElement("span");
+        pill.className = "feel-pill";
+        pill.style.color = meta.text; pill.style.borderColor = meta.border;
+        pill.append(document.createTextNode(name));
+        const x = document.createElement("button");
+        x.className = "x"; x.type = "button"; x.textContent = "×";
+        x.addEventListener("click", async () => { feelings[q].splice(i, 1); await saveFeelings(feelings); renderFeelings(); });
+        pill.appendChild(x);
+        chips.appendChild(pill);
+      });
+      block.appendChild(chips);
+
+      const row = document.createElement("div");
+      row.className = "feel-add";
+      const input = document.createElement("input");
+      input.type = "text"; input.placeholder = "add a feeling…";
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "primary"; btn.textContent = "add";
+      const add = async () => {
+        const v = input.value.trim();
+        if (!v) { input.focus(); return; }
+        if (!feelings[q]) feelings[q] = [];
+        if (!feelings[q].includes(v)) feelings[q].push(v);
+        await saveFeelings(feelings);
+        renderFeelings();
+      };
+      btn.addEventListener("click", add);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") add(); });
+      row.appendChild(input); row.appendChild(btn);
+      block.appendChild(row);
+
+      feelingsEditor.appendChild(block);
+    }
+  }
+
+  function renderReflections() {
+    reflectionsCount.textContent = log.length + " logged";
+    reflectionsList.innerHTML = "";
+    if (!log.length) {
+      const p = document.createElement("p");
+      p.className = "help"; p.style.margin = "0"; p.textContent = "No reflections yet.";
+      reflectionsList.appendChild(p);
+      return;
+    }
+    log.forEach((entry) => {
+      const row = document.createElement("div");
+      row.className = "reflect-row";
+      const when = document.createElement("span");
+      when.className = "reflect-when"; when.textContent = formatDateTime(entry.ts);
+      const body = document.createElement("div");
+      body.className = "reflect-body";
+      const lines = [];
+      if ((entry.thoughts || []).length) lines.push(`<div class="rb-line"><span class="rb-tag">thoughts</span>${escapeHtml(entry.thoughts.join(" · "))}</div>`);
+      if (entry.body) lines.push(`<div class="rb-line"><span class="rb-tag">body</span>${escapeHtml(entry.body)}</div>`);
+      if (entry.mood) lines.push(`<div class="rb-line"><span class="rb-tag">mood</span>${escapeHtml(entry.mood)}</div>`);
+      body.innerHTML = lines.join("") || '<div class="rb-line">(empty)</div>';
+      const del = document.createElement("button");
+      del.className = "break-delete"; del.title = "Delete"; del.textContent = "×";
+      del.addEventListener("click", async () => {
+        log = log.filter((x) => x.id !== entry.id);
+        await saveReflectionLog(log);
+        renderReflections();
+      });
+      row.appendChild(when); row.appendChild(body); row.appendChild(del);
+      reflectionsList.appendChild(row);
+    });
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.reflectionLog) {
+      log = Array.isArray(changes.reflectionLog.newValue) ? changes.reflectionLog.newValue : [];
+      renderReflections();
+    }
+    if (area === "sync" && changes.reflectionFeelings) {
+      const v = changes.reflectionFeelings.newValue;
+      feelings = (v && typeof v === "object") ? v : {};
+      renderFeelings();
+    }
+  });
+
+  (async function initReflections() {
+    feelings = await ensureSeededFeelings();
+    log = await loadReflectionLog();
+    windowMonths = await loadWindowMonths();
+    paintWindow();
+    renderFeelings();
+    renderReflections();
+  })();
+})();
