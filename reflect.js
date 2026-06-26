@@ -11,7 +11,10 @@ const wandEl = document.getElementById("wand");
 const twinkleEl = document.getElementById("twinkle");
 const thoughtInput = document.getElementById("thought-input");
 const thoughtChips = document.getElementById("thought-chips");
-const bodyInput = document.getElementById("body-input");
+const bodyFig = document.getElementById("body-fig");
+const bodyDots = document.getElementById("body-dots");
+const bodyTagsEl = document.getElementById("body-tags");
+const bodyHint = document.getElementById("body-hint");
 const circumplexEl = document.getElementById("circumplex");
 const saveBtn = document.getElementById("save-btn");
 const continueBtn = document.getElementById("continue-btn");
@@ -24,7 +27,32 @@ const TRAIL_OFFSET_X = -6;          // shift the trail from the pointer: negativ
 const TRAIL_OFFSET_Y = -18;         // negative = UP, so the trail rides above the star
 // ==============================================================
 
+// ===== Body-map dots — position of each part on the rabbit, as a fraction of the
+// figure (x: 0 = left → 1 = right, y: 0 = top → 1 = bottom). Nudge to reposition a dot. =====
+const BODY_POINTS = [
+  { part: "listen",       x: 0.207, y: 0.313 }, // the big ear  (155, 485)
+  { part: "neck",         x: 0.571, y: 0.276 }, // (428, 428)
+  { part: "shoulder",     x: 0.604, y: 0.331 }, // (453, 513)
+  { part: "chest & heart",x: 0.773, y: 0.358 }, // (580, 555)
+  { part: "arm",          x: 0.436, y: 0.41 },  // (327, 635)
+  { part: "touch",        x: 0.207, y: 0.516 }, // the hand  (155, 800)
+  { part: "belly / gut",  x: 0.88, y: 0.49 },   // (660, 760)
+  { part: "lower back",   x: 0.544, y: 0.491 }, // (408, 761)
+  { part: "spine",        x: 0.369, y: 0.65 },  // the puff  (277, 1007)
+  { part: "leg",          x: 0.604, y: 0.742 }, // (453, 1150)
+  { part: "feet",         x: 0.601, y: 0.965 }, // (451, 1495)
+];
+// The crowded head senses share one cluster that fans them out to choose.
+const FACE_CLUSTER = { x: 0.667, y: 0.143, members: ["see", "smell", "taste"] }; // (500, 222)
+const NEAR_FRAC = 0.34;             // how close (× figure width) the cursor must be to light a dot
+// ==============================================================
+
 let thoughts = [];
+let bodyTags = [];          // [{ part, note }] — body-map tags, up to BODY_MAX
+const BODY_MAX = 3;
+let bodyDotEls = [];
+let bodyFaceEl = null;
+let bodyFaceOpen = false;   // hysteresis so the face popover stays open while you reach its chips
 let selectedMood = "";
 let windowMonths = 1;
 let reflectionLog = [];
@@ -46,7 +74,8 @@ const STAR_FALLBACKS = [
   "<path d='M12 3 L13.5 10.5 L21 12 L13.5 13.5 L12 21 L10.5 13.5 L3 12 L10.5 10.5 Z' fill='#9ee6a0'/>"
 ].map((p) => svgUri("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'>" + p + "</svg>"));
 
-const STAR_SRCS = [1, 2, 3, 4, 5, 6].map((n) => "images/stars-00" + n + ".png");
+const STAR_COUNT = 21;
+const STAR_SRCS = Array.from({ length: STAR_COUNT }, (_, i) => "images/stars-" + String(i + 1).padStart(3, "0") + ".png");
 function starSrc(i) {
   try { return chrome.runtime.getURL(STAR_SRCS[i]); } catch (e) { return STAR_SRCS[i]; }
 }
@@ -383,6 +412,125 @@ thoughtInput.addEventListener("keydown", (e) => {
     if (v) { thoughts.push(v); thoughtInput.value = ""; renderThoughtChips(); }
   }
 });
+
+// ---------- body map (hover the rabbit → dots reveal labels; tap to tag, jot words, up to BODY_MAX) ----------
+function syncBodyDots() {
+  const sel = new Set(bodyTags.map((t) => t.part));
+  bodyDotEls.forEach((d) => d.classList.toggle("on", sel.has(d.dataset.part)));
+  if (bodyFaceEl) {
+    bodyFaceEl.querySelectorAll(".bface-chip").forEach((c) => c.classList.toggle("on", sel.has(c.dataset.part)));
+    bodyFaceEl.querySelector(".bface-anchor").classList.toggle("on", FACE_CLUSTER.members.some((m) => sel.has(m)));
+  }
+}
+function renderBodyTags() {
+  bodyTagsEl.innerHTML = "";
+  bodyTags.forEach((t, i) => {
+    const row = document.createElement("div");
+    row.className = "body-tag";
+    const head = document.createElement("div");
+    head.className = "body-tag-head";
+    const name = document.createElement("span");
+    name.className = "body-tag-name";
+    name.textContent = t.part;
+    const x = document.createElement("button");
+    x.className = "x"; x.type = "button"; x.textContent = "×";
+    x.addEventListener("click", () => { bodyTags.splice(i, 1); renderBodyTags(); });
+    head.appendChild(name); head.appendChild(x);
+    const note = document.createElement("input");
+    note.type = "text"; note.autocomplete = "off";
+    note.placeholder = "words for this… (optional)";
+    note.value = t.note || "";
+    note.addEventListener("input", () => { t.note = note.value; });
+    row.appendChild(head); row.appendChild(note);
+    bodyTagsEl.appendChild(row);
+  });
+  syncBodyDots();
+}
+function toggleBodyPart(part) {
+  const idx = bodyTags.findIndex((t) => t.part === part);
+  if (idx >= 0) { bodyTags.splice(idx, 1); renderBodyTags(); return; }
+  if (bodyTags.length >= BODY_MAX) {
+    if (bodyHint) {                       // gentle "you're at 3" flash
+      bodyHint.classList.remove("limit");
+      void bodyHint.offsetWidth;          // restart the animation
+      bodyHint.classList.add("limit");
+    }
+    return;
+  }
+  bodyTags.push({ part, note: "" });
+  renderBodyTags();
+}
+function makeDot(part, x, y) {
+  const dot = document.createElement("button");
+  dot.type = "button";
+  dot.className = "bdot";
+  dot.style.left = (x * 100) + "%";
+  dot.style.top = (y * 100) + "%";
+  dot.dataset.part = part;
+  dot._fx = x; dot._fy = y;
+  const lbl = document.createElement("span");
+  lbl.className = "bdot-label"; lbl.textContent = part;
+  dot.appendChild(lbl);
+  return dot;
+}
+function renderBodyDots() {
+  bodyDots.innerHTML = "";
+  bodyDotEls = [];
+  for (const p of BODY_POINTS) {
+    const dot = makeDot(p.part, p.x, p.y);
+    dot.addEventListener("click", (e) => { e.stopPropagation(); toggleBodyPart(p.part); });
+    bodyDots.appendChild(dot);
+    bodyDotEls.push(dot);
+  }
+  // crowded face senses → one cluster anchor that opens see / smell / taste together
+  bodyFaceEl = document.createElement("div");
+  bodyFaceEl.className = "bface";
+  bodyFaceEl.style.left = (FACE_CLUSTER.x * 100) + "%";
+  bodyFaceEl.style.top = (FACE_CLUSTER.y * 100) + "%";
+  const anchor = document.createElement("span");
+  anchor.className = "bdot bface-anchor";
+  bodyFaceEl.appendChild(anchor);
+  const pop = document.createElement("div");
+  pop.className = "bface-pop";
+  for (const m of FACE_CLUSTER.members) {
+    const chip = document.createElement("button");
+    chip.type = "button"; chip.className = "bface-chip"; chip.textContent = m; chip.dataset.part = m;
+    chip.addEventListener("click", (e) => { e.stopPropagation(); toggleBodyPart(m); });
+    pop.appendChild(chip);
+  }
+  bodyFaceEl.appendChild(pop);
+  bodyDots.appendChild(bodyFaceEl);
+  syncBodyDots();
+}
+function onBodyFigMove(e) {
+  const rect = bodyFig.getBoundingClientRect();
+  if (!rect.width) return;
+  const px = e.clientX - rect.left, py = e.clientY - rect.top;
+  const near = NEAR_FRAC * rect.width;
+  const faceDist = Math.hypot(px - FACE_CLUSTER.x * rect.width, py - FACE_CLUSTER.y * rect.height);
+  let best = null, bestD = Infinity;
+  for (const d of bodyDotEls) {
+    const dist = Math.hypot(px - d._fx * rect.width, py - d._fy * rect.height);
+    if (dist < bestD) { bestD = dist; best = d; }
+  }
+  // open the face popover when it's the closest target; keep it open (hysteresis) while reaching the chips
+  bodyFaceOpen = bodyFaceOpen ? (faceDist < near * 1.7) : (faceDist < near && faceDist <= bestD);
+  if (bodyFaceEl) bodyFaceEl.classList.toggle("open", bodyFaceOpen);
+  bodyDotEls.forEach((d) => d.classList.toggle("near", !bodyFaceOpen && d === best && bestD < near));
+}
+function clearBodyNear() {
+  bodyDots.classList.remove("active");   // hide all dots once the cursor leaves the rabbit
+  bodyDotEls.forEach((d) => d.classList.remove("near"));
+  bodyFaceOpen = false;
+  if (bodyFaceEl) bodyFaceEl.classList.remove("open");
+}
+function bindBodyMap() {
+  renderBodyDots();
+  bodyFig.addEventListener("pointerenter", () => bodyDots.classList.add("active"));
+  bodyFig.addEventListener("pointermove", (e) => { bodyDots.classList.add("active"); onBodyFigMove(e); });
+  bodyFig.addEventListener("pointerleave", clearBodyNear);
+}
+
 function renderCircumplex() {
   for (const q of QUADRANTS) {
     const cell = circumplexEl.querySelector(`.cx-cell[data-q="${q}"]`);
@@ -445,7 +593,8 @@ function addFeelingInline(cell, q) {
 
 function resetFields() {
   thoughts = []; renderThoughtChips();
-  bodyInput.value = ""; selectedMood = "";
+  bodyTags = []; renderBodyTags();
+  selectedMood = "";
   renderCircumplex();
 }
 function openCompose() {
@@ -458,9 +607,11 @@ function closeCompose() {
   modalOpen = false; updateWand();
 }
 async function saveReflection() {
-  const body = bodyInput.value.trim();
+  const body = bodyTags
+    .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
+    .filter((t) => t.part);
   const mood = selectedMood;
-  if (thoughts.length || body || mood) {
+  if (thoughts.length || body.length || mood) {
     reflectionLog.unshift({ id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood });
     await saveReflectionLog(reflectionLog);
     renderStars();
@@ -518,6 +669,8 @@ nativeCursorZone(winToggle);
   feelings = await ensureSeededFeelings();
   bindCircumplexCells();
   renderCircumplex();
+  bindBodyMap();
+  renderBodyTags();
   windowMonths = await loadWindowMonths();
   paintToggle();
   reflectionLog = await loadReflectionLog();

@@ -34,7 +34,16 @@
       </div>
       <div class="field">
         <label>Body</label>
-        <input id="body-input" type="text" autocomplete="off" placeholder="How does your body feel?" />
+        <div class="bodymap">
+          <div class="bodymap-fig" id="body-fig">
+            <img id="body-img" src="images/body.png" alt="" draggable="false" />
+            <div id="body-dots"></div>
+          </div>
+          <div class="bodymap-side">
+            <p id="body-hint" class="bodymap-hint">Hover the rabbit — tap a glowing point (up to 3).</p>
+            <div id="body-tags"></div>
+          </div>
+        </div>
       </div>
       <div class="field">
         <label>Mood</label>

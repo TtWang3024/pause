@@ -68,7 +68,14 @@ function reflectionStars(log, windowMonths, nowTs) {
       stars.push({ id: entry.id + ":" + kind + ":" + idx, kind, text: t, ts: entry.ts });
     };
     (entry.thoughts || []).forEach((t, i) => add("thought", t, i));
-    add("body", entry.body, 0);
+    // body may be a legacy string OR an array of { part, note } tags
+    const bodyItems = Array.isArray(entry.body)
+      ? entry.body
+      : (entry.body ? [{ part: "", note: entry.body }] : []);
+    bodyItems.forEach((b, i) => {
+      const txt = b.part ? (b.note ? b.part + " — " + b.note : b.part) : (b.note || "");
+      add("body", txt, i);
+    });
     add("mood", entry.mood, 0);
   }
   return { stars, start, end: nowTs };

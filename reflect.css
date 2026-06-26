@@ -112,12 +112,12 @@ body.theme-white #compose {
   text-transform: uppercase; opacity: 0.55; margin-bottom: 6px;
 }
 
-#thought-input, #body-input {
+#thought-input {
   width: 100%; font-family: inherit; font-size: 14px; padding: 9px 11px;
   border-radius: 8px; border: 1px solid rgba(128,128,128,0.4);
   background: rgba(128,128,128,0.12); color: inherit; cursor: none;
 }
-#thought-input::placeholder, #body-input::placeholder { color: inherit; opacity: 0.4; }
+#thought-input::placeholder { color: inherit; opacity: 0.4; }
 
 #thought-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
 #thought-chips:empty { display: none; }
@@ -131,6 +131,61 @@ body.theme-white #compose {
   font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 999px;
   border: none; background: rgba(0,0,0,0.18); color: inherit; cursor: none;
 }
+
+/* body map — hover the rabbit; glowing dots reveal labels; tap to tag where you feel something */
+.bodymap { display: flex; gap: 16px; align-items: flex-start; }
+.bodymap-fig { position: relative; flex: 0 0 190px; width: 190px; }
+#body-img { display: block; width: 100%; height: auto; pointer-events: none; user-select: none; -webkit-user-drag: none; }
+#body-dots { position: absolute; inset: 0; opacity: 0; transition: opacity 0.18s ease; }
+#body-dots.active { opacity: 1; }   /* dots only appear while the cursor is over the rabbit */
+
+.bdot {
+  position: absolute; width: 15px; height: 15px; margin: -7.5px 0 0 -7.5px; padding: 0;
+  border: none; border-radius: 50%; cursor: pointer; opacity: 0.34; transform: scale(0.82);
+  background: radial-gradient(circle, rgba(255,238,175,0.97) 0%, rgba(255,205,110,0.65) 55%, rgba(255,205,110,0) 76%);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+.bdot:hover, .bdot.near { opacity: 1; transform: scale(1.18); }
+.bdot.on {
+  opacity: 1; transform: scale(1.12);
+  background: radial-gradient(circle, #fff 0%, #ff9b6b 58%, rgba(255,155,107,0) 78%);
+}
+.bdot-label {
+  position: absolute; left: 50%; bottom: 145%; transform: translateX(-50%);
+  white-space: nowrap; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  background: rgba(20,20,30,0.92); color: #fff; opacity: 0; pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+.bdot:hover .bdot-label, .bdot.near .bdot-label, .bdot.on .bdot-label { opacity: 1; }
+body.theme-white .bdot-label { background: rgba(45,45,60,0.95); }
+
+/* crowded head senses → one cluster that opens see / smell / taste together */
+.bface { position: absolute; }
+.bface-anchor { left: 0; top: 0; pointer-events: none; }
+.bface.open .bface-anchor { opacity: 1; transform: scale(1.18); }
+.bface-pop {
+  position: absolute; left: 15px; top: 0;
+  display: none; flex-direction: column; gap: 4px;
+}
+.bface.open .bface-pop { display: flex; }
+.bface-chip {
+  font-family: inherit; font-size: 11px; white-space: nowrap; padding: 4px 10px; border-radius: 999px;
+  border: 1px solid rgba(255,205,110,0.7); background: rgba(20,20,30,0.92); color: #fff; cursor: pointer;
+}
+body.theme-white .bface-chip { background: rgba(45,45,60,0.95); }
+.bface-chip.on { background: #ff9b6b; border-color: #ff9b6b; color: #fff; }
+
+.bodymap-side { flex: 1 1 auto; min-width: 0; }
+.bodymap-hint { margin: 0 0 8px; font-size: 12px; opacity: 0.6; }
+.bodymap-hint.limit { animation: bodyhint-flash 0.5s ease; }
+@keyframes bodyhint-flash { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; color: #ff9b6b; } }
+#body-tags { display: flex; flex-direction: column; gap: 8px; }
+.body-tag { background: rgba(128,128,128,0.12); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.body-tag-head { display: flex; align-items: center; justify-content: space-between; }
+.body-tag-name { font-weight: 600; font-size: 13px; }
+.body-tag .x { border: none; background: rgba(0,0,0,0.18); color: inherit; border-radius: 999px; padding: 1px 7px; cursor: pointer; font-size: 13px; line-height: 1; }
+.body-tag input { width: 100%; font-family: inherit; font-size: 13px; padding: 6px 9px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.4); background: rgba(128,128,128,0.1); color: inherit; }
+.body-tag input::placeholder { color: inherit; opacity: 0.4; }
 
 /* Russell circumplex mood map */
 #circumplex { display: flex; flex-direction: column; gap: 4px; }

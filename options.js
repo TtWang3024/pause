@@ -505,7 +505,13 @@ saveBtn.addEventListener("click", async () => {
       body.className = "reflect-body";
       const lines = [];
       if ((entry.thoughts || []).length) lines.push(`<div class="rb-line"><span class="rb-tag">thoughts</span>${escapeHtml(entry.thoughts.join(" · "))}</div>`);
-      if (entry.body) lines.push(`<div class="rb-line"><span class="rb-tag">body</span>${escapeHtml(entry.body)}</div>`);
+      const bodyItems = Array.isArray(entry.body)
+        ? entry.body
+        : (entry.body ? [{ part: "", note: entry.body }] : []);
+      const bodyTxt = bodyItems
+        .map((b) => (b.part ? (b.note ? `${b.part}: ${b.note}` : b.part) : (b.note || "")))
+        .filter(Boolean).join(" · ");
+      if (bodyTxt) lines.push(`<div class="rb-line"><span class="rb-tag">body</span>${escapeHtml(bodyTxt)}</div>`);
       if (entry.mood) lines.push(`<div class="rb-line"><span class="rb-tag">mood</span>${escapeHtml(entry.mood)}</div>`);
       body.innerHTML = lines.join("") || '<div class="rb-line">(empty)</div>';
       const del = document.createElement("button");
@@ -540,4 +546,30 @@ saveBtn.addEventListener("click", async () => {
     renderFeelings();
     renderReflections();
   })();
+})();
+
+// ===== Left-nav: switch between Pause / Break / Magic stars panels =====
+(function settingsNav() {
+  const NAV_KEY = "settingsActivePanel";
+  const buttons = Array.from(document.querySelectorAll(".nav-btn"));
+  const panels = Array.from(document.querySelectorAll(".settings-panel"));
+  if (!buttons.length || !panels.length) return;
+
+  function show(name) {
+    buttons.forEach((b) => b.classList.toggle("active", b.dataset.panel === name));
+    panels.forEach((p) => p.classList.toggle("active", p.dataset.panel === name));
+    try { localStorage.setItem(NAV_KEY, name); } catch (e) {}
+  }
+
+  buttons.forEach((b) => b.addEventListener("click", () => {
+    show(b.dataset.panel);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }));
+
+  let initial = "pause";
+  try {
+    const saved = localStorage.getItem(NAV_KEY);
+    if (saved && panels.some((p) => p.dataset.panel === saved)) initial = saved;
+  } catch (e) {}
+  show(initial);
 })();

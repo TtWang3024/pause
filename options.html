@@ -17,105 +17,124 @@
     <span class="save-note">Saves groups, pause, background &amp; break settings. Break activities and history save on their own.</span>
   </div>
 
-  <section>
-    <h2>Groups</h2>
-    <p class="help">Each group has its own pause length. Add sites as domains, one per line — subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
-    <div id="groups"></div>
-    <button id="add-group" class="ghost">+ New group</button>
-  </section>
+  <div class="settings-layout">
+    <nav class="settings-nav" id="settings-nav">
+      <button class="nav-btn active" data-panel="pause" type="button">Pause</button>
+      <button class="nav-btn" data-panel="break" type="button">Break</button>
+      <button class="nav-btn" data-panel="magic" type="button">Magic stars</button>
+    </nav>
 
-  <section>
-    <h2>Countdown behavior</h2>
-    <label class="toggle">
-      <input id="reset-on-release" type="checkbox" />
-      <span>Reset timer when I release the mouse</span>
-    </label>
-    <p class="help">Off: releasing pauses the timer where it is. On: releasing snaps it back to full.</p>
-  </section>
+    <div class="settings-content">
+      <!-- ===================== PAUSE ===================== -->
+      <div class="settings-panel active" data-panel="pause">
+        <section>
+          <h2>Groups</h2>
+          <p class="help">Each group has its own pause length. Add sites as domains, one per line — subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
+          <div id="groups"></div>
+          <button id="add-group" class="ghost">+ New group</button>
+        </section>
 
-  <section>
-    <h2>Pause page background</h2>
-    <div class="bg-choices">
-      <label><input type="radio" name="bg" value="black"> Black</label>
-      <label><input type="radio" name="bg" value="white"> White</label>
-      <label><input type="radio" name="bg" value="custom"> Custom</label>
-      <input id="bg-custom" type="color" value="#222244" />
-    </div>
-  </section>
+        <section>
+          <h2>Countdown behavior</h2>
+          <label class="toggle">
+            <input id="reset-on-release" type="checkbox" />
+            <span>Reset timer when I release the mouse</span>
+          </label>
+          <p class="help">Off: releasing pauses the timer where it is. On: releasing snaps it back to full.</p>
+        </section>
 
-  <section>
-    <h2>After completing a pause</h2>
-    <label>Allow visits to the same site freely for the next
-      <input id="allowance" type="number" min="3" max="25" step="1" /> minutes (3–25).
-    </label>
-    <p class="time-hint">This is the default session length; you can change it each time on the commitment screen.</p>
+        <section>
+          <h2>Pause page background</h2>
+          <div class="bg-choices">
+            <label><input type="radio" name="bg" value="black"> Black</label>
+            <label><input type="radio" name="bg" value="white"> White</label>
+            <label><input type="radio" name="bg" value="custom"> Custom</label>
+            <input id="bg-custom" type="color" value="#222244" />
+          </div>
+        </section>
+      </div>
 
-    <hr />
+      <!-- ===================== BREAK ===================== -->
+      <div class="settings-panel" data-panel="break">
+        <section>
+          <h2>Break stats</h2>
+          <p class="help">What you reach for on breaks.</p>
+          <div class="stats-block">
+            <div class="stats-title">Favourites</div>
+            <div id="stats-favourites"></div>
+          </div>
+          <div class="stats-block">
+            <div class="stats-title">Least chosen</div>
+            <div id="stats-least"></div>
+          </div>
+          <div class="stats-block">
+            <div class="stats-title">By area</div>
+            <div id="stats-pie"></div>
+          </div>
+        </section>
 
-    <label class="toggle">
-      <input id="force-break" type="checkbox" />
-      <span>Force a break after the allowance ends</span>
-    </label>
-    <div id="break-options">
-      <p class="time-hint">Before each session you'll commit to a break length on a new screen — it always opens at the maximum, so you actively choose a shorter break each time.</p>
-      <label class="block">Break screen message
-        <textarea id="break-message" rows="2" placeholder="Words to read while you cool down"></textarea>
-      </label>
-    </div>
-  </section>
+        <section>
+          <div class="breaks-head">
+            <h2>All breaks</h2>
+            <span id="breaks-count" class="breaks-count">0 logged</span>
+          </div>
+          <div id="breaks-list"></div>
+        </section>
 
-  <section>
-    <h2>Break activities</h2>
-    <p class="help">Predefine what you might do on a break. When a break starts you'll pick up to 3 of these (or add new ones on the spot). Drag the handle to reorder.</p>
-    <div id="activities-list"></div>
-    <div class="activity-add-row">
-      <input id="new-activity-name" type="text" placeholder="activity name" autocomplete="off" />
-      <input id="new-activity-tag" type="text" placeholder="area / tag" autocomplete="off" />
-      <button id="add-activity" class="primary">add</button>
-    </div>
-  </section>
+        <section>
+          <h2>Break activities</h2>
+          <p class="help">Predefine what you might do on a break. When a break starts you'll pick up to 3 of these (or add new ones on the spot). Drag the handle to reorder.</p>
+          <div id="activities-list"></div>
+          <div class="activity-add-row">
+            <input id="new-activity-name" type="text" placeholder="activity name" autocomplete="off" />
+            <input id="new-activity-tag" type="text" placeholder="area / tag" autocomplete="off" />
+            <button id="add-activity" class="primary">add</button>
+          </div>
+        </section>
 
-  <section>
-    <h2>Break stats</h2>
-    <p class="help">What you reach for on breaks.</p>
-    <div class="stats-block">
-      <div class="stats-title">Favourites</div>
-      <div id="stats-favourites"></div>
-    </div>
-    <div class="stats-block">
-      <div class="stats-title">Least chosen</div>
-      <div id="stats-least"></div>
-    </div>
-    <div class="stats-block">
-      <div class="stats-title">By area</div>
-      <div id="stats-pie"></div>
-    </div>
-  </section>
+        <section>
+          <h2>After completing a pause</h2>
+          <label>Allow visits to the same site freely for the next
+            <input id="allowance" type="number" min="3" max="25" step="1" /> minutes (3–25).
+          </label>
+          <p class="time-hint">This is the default session length; you can change it each time on the commitment screen.</p>
 
-  <section>
-    <div class="breaks-head">
-      <h2>All breaks</h2>
-      <span id="breaks-count" class="breaks-count">0 logged</span>
-    </div>
-    <div id="breaks-list"></div>
-  </section>
+          <hr />
 
-  <section>
-    <h2>Reflections</h2>
-    <p class="help">Your "magic power" notes — thoughts, body, and mood — captured before each session and shown as a star map on the reflection screen.</p>
-    <div class="reflect-window">
-      Star map shows the last
-      <button class="rwin-btn" data-m="1" type="button">1 month</button>
-      <button class="rwin-btn" data-m="6" type="button">6 months</button>
+          <label class="toggle">
+            <input id="force-break" type="checkbox" />
+            <span>Force a break after the allowance ends</span>
+          </label>
+          <div id="break-options">
+            <p class="time-hint">Before each session you'll commit to a break length on a new screen — it always opens at the maximum, so you actively choose a shorter break each time.</p>
+            <label class="block">Break screen message
+              <textarea id="break-message" rows="2" placeholder="Words to read while you cool down"></textarea>
+            </label>
+          </div>
+        </section>
+      </div>
+
+      <!-- ===================== MAGIC STARS ===================== -->
+      <div class="settings-panel" data-panel="magic">
+        <section>
+          <h2>Magic stars</h2>
+          <p class="help">Your "magic power" notes — thoughts, body, and mood — captured before each session and shown as a star map on the reflection screen.</p>
+          <div class="reflect-window">
+            Star map shows the last
+            <button class="rwin-btn" data-m="1" type="button">1 month</button>
+            <button class="rwin-btn" data-m="6" type="button">6 months</button>
+          </div>
+          <div class="reflect-subhead">Feelings (mood map)</div>
+          <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence–arousal circumplex. Add or remove any.</p>
+          <div id="feelings-editor"></div>
+          <div class="reflect-subhead">History
+            <span id="reflections-count" class="breaks-count">0 logged</span>
+          </div>
+          <div id="reflections-list"></div>
+        </section>
+      </div>
     </div>
-    <div class="reflect-subhead">Feelings (mood map)</div>
-    <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence–arousal circumplex. Add or remove any.</p>
-    <div id="feelings-editor"></div>
-    <div class="reflect-subhead">History
-      <span id="reflections-count" class="breaks-count">0 logged</span>
-    </div>
-    <div id="reflections-list"></div>
-  </section>
+  </div>
 
   <template id="group-template">
     <div class="group" data-id="">

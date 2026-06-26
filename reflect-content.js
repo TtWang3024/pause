@@ -211,7 +211,7 @@
     if (centerStar) return;
     const img = document.createElement("img");
     img.className = "summon";
-    img.src = chrome.runtime.getURL("images/stars-00" + (1 + Math.floor(Math.random() * 6)) + ".png");
+    img.src = chrome.runtime.getURL("images/stars-" + String(1 + Math.floor(Math.random() * 21)).padStart(3, "0") + ".png");
     img.alt = ""; img.title = "Open reflection";
     centerStar = img;
     root.appendChild(img);

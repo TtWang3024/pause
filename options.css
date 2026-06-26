@@ -31,8 +31,65 @@ body {
   background: var(--bg);
   color: var(--fg);
   padding: 32px;
-  max-width: 760px;
+  max-width: 940px;
   margin: 0 auto;
+}
+
+/* ---- left-nav settings layout ---- */
+.settings-layout {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.settings-nav {
+  flex: 0 0 168px;
+  position: sticky;
+  top: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-btn {
+  font-family: 'Baloo 2', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  padding: 11px 14px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.nav-btn:hover { background: rgba(0, 0, 0, 0.04); color: var(--fg); }
+.nav-btn.active {
+  background: #fff;
+  color: var(--fg);
+  border-color: var(--border);
+  font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.settings-content {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.settings-panel { display: none; }
+.settings-panel.active { display: block; }
+.settings-panel section:last-child { margin-bottom: 0; }
+
+@media (max-width: 680px) {
+  .settings-layout { flex-direction: column; }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex: 0 0 auto;
+    overflow-x: auto;
+  }
 }
 
 header h1 {
