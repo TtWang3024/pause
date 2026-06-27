@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS = {
 };
 
 const groupsEl = document.getElementById("groups");
-const addGroupBtn = document.getElementById("add-group");
+const groupTabsEl = document.getElementById("group-tabs");
+let activeGroupId = null;
 const saveBtn = document.getElementById("save");
 const statusEl = document.getElementById("status");
 const allowanceEl = document.getElementById("allowance");
@@ -33,7 +34,13 @@ function renderGroup(group) {
   node.querySelector(".group-name").value = group.name || "";
   node.querySelector(".group-seconds").value = group.pauseSeconds ?? 10;
   node.querySelector(".group-sites").value = (group.sites || []).join("\n");
-  node.querySelector(".delete-group").addEventListener("click", () => node.remove());
+  node.querySelector(".group-name").addEventListener("input", renderGroupTabs);   // live tab label
+  node.querySelector(".delete-group").addEventListener("click", () => {
+    const wasActive = node.dataset.id === activeGroupId;
+    node.remove();
+    renderGroupTabs();
+    if (wasActive) activateGroup(groupsEl.querySelector(".group")?.dataset.id || null);
+  });
 
   const schedule = group.schedule || DEFAULT_SCHEDULE;
   const activeDays = new Set(schedule.days || DEFAULT_SCHEDULE.days);
@@ -53,6 +60,40 @@ function renderGroup(group) {
   });
 
   groupsEl.appendChild(node);
+}
+
+// Groups are a horizontal segmented control — one editor visible at a time.
+function renderGroupTabs() {
+  groupTabsEl.innerHTML = "";
+  for (const card of groupsEl.querySelectorAll(".group")) {
+    const id = card.dataset.id;
+    const tab = document.createElement("button");
+    tab.type = "button";
+    tab.className = "group-tab" + (id === activeGroupId ? " active" : "");
+    tab.textContent = card.querySelector(".group-name").value.trim() || "Untitled";
+    tab.dataset.id = id;
+    tab.addEventListener("click", () => activateGroup(id));
+    groupTabsEl.appendChild(tab);
+  }
+  const add = document.createElement("button");
+  add.type = "button"; add.className = "group-tab-add"; add.title = "New group"; add.textContent = "+";
+  add.addEventListener("click", addGroup);
+  groupTabsEl.appendChild(add);
+}
+function activateGroup(id) {
+  activeGroupId = id;
+  groupsEl.querySelectorAll(".group").forEach((card) => {
+    card.classList.toggle("group-hidden", card.dataset.id !== id);
+  });
+  groupTabsEl.querySelectorAll(".group-tab").forEach((tab) => {
+    tab.classList.toggle("active", tab.dataset.id === id);
+  });
+}
+function addGroup() {
+  const g = { id: uuid(), name: "", pauseSeconds: 10, sites: [], schedule: { ...DEFAULT_SCHEDULE } };
+  renderGroup(g);
+  renderGroupTabs();
+  activateGroup(g.id);
 }
 
 function readGroups() {
@@ -107,10 +148,6 @@ function syncBreakVisibility() {
   breakOptionsEl.classList.toggle("hidden", !forceBreakEl.checked);
 }
 
-addGroupBtn.addEventListener("click", () => {
-  renderGroup({ id: uuid(), name: "", pauseSeconds: 10, sites: [], schedule: { ...DEFAULT_SCHEDULE } });
-});
-
 forceBreakEl.addEventListener("change", syncBreakVisibility);
 
 saveBtn.addEventListener("click", async () => {
@@ -131,6 +168,8 @@ saveBtn.addEventListener("click", async () => {
   const { settings } = await chrome.storage.sync.get("settings");
   const s = { ...DEFAULT_SETTINGS, ...(settings || {}) };
   s.groups.forEach(renderGroup);
+  renderGroupTabs();
+  activateGroup(groupsEl.querySelector(".group")?.dataset.id || null);
   applyBackgroundUI(s.background);
   allowanceEl.value = Math.min(25, Math.max(3, s.allowanceMinutes ?? 5));
   resetOnReleaseEl.checked = !!s.resetOnRelease;
@@ -181,8 +220,8 @@ saveBtn.addEventListener("click", async () => {
           <span class="drag-handle">⠿</span>
           <input class="edit-name" />
           <input class="edit-tag" placeholder="tag" />
-          <button class="act-save">save</button>
-          <button class="act-cancel">cancel</button>`;
+          <button class="act-save" title="Save"><img class="btn-icon" src="images/save.png" alt="save" /></button>
+          <button class="act-cancel" title="Cancel"><img class="btn-icon" src="images/cancel.png" alt="cancel" /></button>`;
         const nameInput = row.querySelector(".edit-name");
         const tagInput = row.querySelector(".edit-tag");
         nameInput.value = a.name;
@@ -207,8 +246,8 @@ saveBtn.addEventListener("click", async () => {
           <span class="act-count"></span>
           <span class="act-date"></span>
           <span class="act-tag"></span>
-          <button class="act-edit">edit</button>
-          <button class="act-delete" title="Delete">×</button>`;
+          <button class="act-edit" title="Edit"><img class="btn-icon" src="images/edit.svg" alt="edit" /></button>
+          <button class="act-delete" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>`;
         row.querySelector(".act-name").textContent = a.name;
         row.querySelector(".act-count").textContent = (count[a.id] || 0) + "×";
         row.querySelector(".act-date").textContent = last[a.id] ? formatShortDate(last[a.id]) : "—";
@@ -333,8 +372,9 @@ saveBtn.addEventListener("click", async () => {
           <div class="break-chips">${chips || '<span class="stat-empty">no activities</span>'}</div>
           <div class="break-edit-add">
             <select class="break-add-select">${options || '<option value="">(no saved activities)</option>'}</select>
-            <button class="break-add-btn">+ add</button>
-            <button class="break-save act-save">done</button>
+            <button class="break-add-btn add-icon-btn" title="Add"><img src="images/add.png" alt="add" /></button>
+            <button class="break-save act-save" title="Done"><img class="btn-icon" src="images/save.png" alt="done" /></button>
+            <button class="break-cancel act-cancel" title="Cancel"><img class="btn-icon" src="images/cancel.png" alt="cancel" /></button>
           </div>`;
 
         row.querySelectorAll(".chip-x").forEach((btn) => {
@@ -365,6 +405,10 @@ saveBtn.addEventListener("click", async () => {
           editingBreakId = null;
           renderBreaks();
         });
+        row.querySelector(".break-cancel").addEventListener("click", () => {
+          editingBreakId = null;
+          renderBreaks();
+        });
       } else {
         const acts = (entry.activities || [])
           .map((a) => escapeHtml(a.name) + (a.tag ? " / " + escapeHtml(a.tag) : ""))
@@ -373,8 +417,8 @@ saveBtn.addEventListener("click", async () => {
           <span class="break-when">${escapeHtml(formatDateTime(entry.ts))}</span>
           <span class="break-dur">${entry.durationMin}m</span>
           <span class="break-acts"></span>
-          <button class="break-edit">edit</button>
-          <button class="break-delete" title="Delete">×</button>`;
+          <button class="break-edit" title="Edit"><img class="btn-icon" src="images/edit.svg" alt="edit" /></button>
+          <button class="break-delete" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>`;
         row.querySelector(".break-acts").textContent = acts;
         row.querySelector(".break-edit").addEventListener("click", () => {
           editingBreakId = entry.id;
@@ -412,15 +456,19 @@ saveBtn.addEventListener("click", async () => {
 // ===== Reflections (history, mood palette, star-map window) =====
 (function reflectionsModule() {
   const winButtons = document.querySelectorAll(".rwin-btn");
+  const reduceMotionBox = document.getElementById("reduce-motion");
   const feelingsEditor = document.getElementById("feelings-editor");
   const reflectionsList = document.getElementById("reflections-list");
   const reflectionsCount = document.getElementById("reflections-count");
 
-  const Q_LABELS = {
-    tl: "Unpleasant · high energy",
-    tr: "Pleasant · high energy",
-    bl: "Unpleasant · low energy",
-    br: "Pleasant · calm"
+  reduceMotionBox.addEventListener("change", () => saveReduceMotion(reduceMotionBox.checked));
+
+  // Each title reads: (arousal icon) high/low arousal · (valence icon) positive/negative
+  const Q_PARTS = {
+    tl: { arousalIcon: "sun",  arousalWord: "high arousal", valenceIcon: "cactus", valenceWord: "negative" },
+    tr: { arousalIcon: "sun",  arousalWord: "high arousal", valenceIcon: "lily",   valenceWord: "positive" },
+    bl: { arousalIcon: "moon", arousalWord: "low arousal",  valenceIcon: "cactus", valenceWord: "negative" },
+    br: { arousalIcon: "moon", arousalWord: "low arousal",  valenceIcon: "lily",   valenceWord: "positive" }
   };
 
   let feelings = {};
@@ -446,7 +494,17 @@ saveBtn.addEventListener("click", async () => {
       block.style.borderColor = meta.border;
 
       const h = document.createElement("div");
-      h.className = "feel-q-label"; h.textContent = Q_LABELS[q]; h.style.color = meta.text;
+      h.className = "feel-q-label"; h.style.color = meta.text;
+      const p = Q_PARTS[q];
+      const mkIco = (name) => {
+        const i = document.createElement("img");
+        i.className = "feel-q-ico"; i.src = "images/" + name + ".png"; i.alt = "";
+        return i;
+      };
+      h.appendChild(mkIco(p.arousalIcon));
+      h.appendChild(document.createTextNode(p.arousalWord + " · "));
+      h.appendChild(mkIco(p.valenceIcon));
+      h.appendChild(document.createTextNode(p.valenceWord));
       block.appendChild(h);
 
       const chips = document.createElement("div");
@@ -469,7 +527,9 @@ saveBtn.addEventListener("click", async () => {
       const input = document.createElement("input");
       input.type = "text"; input.placeholder = "add a feeling…";
       const btn = document.createElement("button");
-      btn.type = "button"; btn.className = "primary"; btn.textContent = "add";
+      btn.type = "button"; btn.className = "add-icon-btn"; btn.title = "Add";
+      const addImg = document.createElement("img"); addImg.src = "images/add.png"; addImg.alt = "add";
+      btn.appendChild(addImg);
       const add = async () => {
         const v = input.value.trim();
         if (!v) { input.focus(); return; }
@@ -512,10 +572,12 @@ saveBtn.addEventListener("click", async () => {
         .map((b) => (b.part ? (b.note ? `${b.part}: ${b.note}` : b.part) : (b.note || "")))
         .filter(Boolean).join(" · ");
       if (bodyTxt) lines.push(`<div class="rb-line"><span class="rb-tag">body</span>${escapeHtml(bodyTxt)}</div>`);
-      if (entry.mood) lines.push(`<div class="rb-line"><span class="rb-tag">mood</span>${escapeHtml(entry.mood)}</div>`);
+      const moods = Array.isArray(entry.mood) ? entry.mood : (entry.mood ? [entry.mood] : []);
+      if (moods.length) lines.push(`<div class="rb-line"><span class="rb-tag">mood</span>${escapeHtml(moods.join(" · "))}</div>`);
       body.innerHTML = lines.join("") || '<div class="rb-line">(empty)</div>';
       const del = document.createElement("button");
-      del.className = "break-delete"; del.title = "Delete"; del.textContent = "×";
+      del.className = "break-delete"; del.title = "Delete";
+      del.innerHTML = '<img class="btn-icon" src="images/delete.svg" alt="delete" />';
       del.addEventListener("click", async () => {
         log = log.filter((x) => x.id !== entry.id);
         await saveReflectionLog(log);
@@ -543,6 +605,7 @@ saveBtn.addEventListener("click", async () => {
     log = await loadReflectionLog();
     windowMonths = await loadWindowMonths();
     paintWindow();
+    reduceMotionBox.checked = await loadReduceMotion();
     renderFeelings();
     renderReflections();
   })();

@@ -12,7 +12,7 @@
   </header>
 
   <div class="save-bar">
-    <button id="save" class="primary">Save</button>
+    <button id="save" class="primary save-btn"><img src="images/save.png" alt="" class="save-ico" />Save</button>
     <span id="status"></span>
     <span class="save-note">Saves groups, pause, background &amp; break settings. Break activities and history save on their own.</span>
   </div>
@@ -30,8 +30,8 @@
         <section>
           <h2>Groups</h2>
           <p class="help">Each group has its own pause length. Add sites as domains, one per line — subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
+          <div id="group-tabs" class="group-tabs"></div>
           <div id="groups"></div>
-          <button id="add-group" class="ghost">+ New group</button>
         </section>
 
         <section>
@@ -74,21 +74,13 @@
         </section>
 
         <section>
-          <div class="breaks-head">
-            <h2>All breaks</h2>
-            <span id="breaks-count" class="breaks-count">0 logged</span>
-          </div>
-          <div id="breaks-list"></div>
-        </section>
-
-        <section>
           <h2>Break activities</h2>
           <p class="help">Predefine what you might do on a break. When a break starts you'll pick up to 3 of these (or add new ones on the spot). Drag the handle to reorder.</p>
           <div id="activities-list"></div>
           <div class="activity-add-row">
             <input id="new-activity-name" type="text" placeholder="activity name" autocomplete="off" />
             <input id="new-activity-tag" type="text" placeholder="area / tag" autocomplete="off" />
-            <button id="add-activity" class="primary">add</button>
+            <button id="add-activity" class="add-icon-btn" title="Add"><img src="images/add.png" alt="add" /></button>
           </div>
         </section>
 
@@ -112,22 +104,49 @@
             </label>
           </div>
         </section>
+
+        <section>
+          <details id="breaks-fold">
+            <summary class="breaks-head fold-summary">
+              <span class="fold-title"><span class="fold-chevron">▸</span><h2>All breaks</h2></span>
+              <span id="breaks-count" class="breaks-count">0 logged</span>
+            </summary>
+            <div id="breaks-list"></div>
+          </details>
+        </section>
       </div>
 
       <!-- ===================== MAGIC STARS ===================== -->
       <div class="settings-panel" data-panel="magic">
         <section>
           <h2>Magic stars</h2>
-          <p class="help">Your "magic power" notes — thoughts, body, and mood — captured before each session and shown as a star map on the reflection screen.</p>
+          <p class="help">Your "magic power" notes (thoughts, body, and mood) are captured before each session and shown as a star map on the reflection screen.</p>
+          <p class="help">The moment before you open a distracting site is an impulse. Naming what's happening (your thoughts, where you feel it in your body, your mood) is called <em>affect labeling</em>. Putting a feeling into words is an evidence-based way to loosen its grip, so each session can open with a small, unhurried reflection instead of a reflex. Your notes never leave your device. Over time they gather into a private <strong>star map</strong>, where more recent notes shine brighter. No scores, no streaks, no judgement. Just your own sky to glance back at.</p>
+        </section>
+
+        <section>
+          <h2>Display</h2>
           <div class="reflect-window">
             Star map shows the last
             <button class="rwin-btn" data-m="1" type="button">1 month</button>
             <button class="rwin-btn" data-m="6" type="button">6 months</button>
           </div>
-          <div class="reflect-subhead">Feelings (mood map)</div>
+          <label class="toggle">
+            <input id="reduce-motion" type="checkbox" />
+            <span>Reduced motion (e-ink friendly) — turn off the wand trail, sparkles, and twinkle</span>
+          </label>
+          <p class="help" style="margin-top:4px;">Best for e-ink or low-power screens that leave faint marks. The wand still follows your cursor. Your OS "reduce motion" setting also turns this on automatically.</p>
+        </section>
+
+        <section>
+          <h2>Feelings (mood map)</h2>
           <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence–arousal circumplex. Add or remove any.</p>
           <div id="feelings-editor"></div>
-          <div class="reflect-subhead">History
+        </section>
+
+        <section>
+          <div class="breaks-head">
+            <h2>All reflections</h2>
             <span id="reflections-count" class="breaks-count">0 logged</span>
           </div>
           <div id="reflections-list"></div>
@@ -143,7 +162,7 @@
         <label>Pause
           <input class="group-seconds" type="number" min="1" max="600" step="1" /> sec
         </label>
-        <button class="delete-group ghost danger">Delete</button>
+        <button class="delete-group" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>
       </div>
       <textarea class="group-sites" placeholder="one site per line, e.g.&#10;youtube.com&#10;reddit.com/r/funny" rows="4"></textarea>
       <div class="schedule">

@@ -17,25 +17,15 @@ html, body {
   user-select: none;
   cursor: none; /* the wand replaces the real cursor */
 }
+/* The screen itself is always a night sky; only the compose panel follows the theme. */
 body { background: #04040a; color: #fff; }
-body.theme-white { background: #f3f4fb; color: #111; }
 
 #trail { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-#starmap { position: fixed; inset: 0; z-index: 1; pointer-events: none; }
-
-.star, .star-dot {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: auto;
-}
-.star { object-fit: contain; }
-.star-dot {
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.5) 60%, rgba(255,255,255,0) 100%);
-}
+/* the planetarium-dome canvas — receives drag-to-pan / wheel-to-zoom */
+#skymap { position: fixed; inset: 0; z-index: 1; pointer-events: auto; touch-action: none; }
 
 #tooltip {
-  position: fixed; z-index: 6; pointer-events: none;
+  position: fixed; z-index: 10001; pointer-events: none;   /* above the wand sprite */
   max-width: 280px; padding: 8px 12px; border-radius: 10px;
   background: rgba(20, 20, 30, 0.92); color: #fff;
   font-size: 14px; line-height: 1.4;
@@ -80,7 +70,7 @@ body.theme-white { background: #f3f4fb; color: #111; }
   background: rgba(0, 0, 0, 0.32);
 }
 #compose-overlay.open { display: flex; }
-body.theme-white #compose-overlay { background: rgba(255, 255, 255, 0.4); }
+body.compose-light #compose-overlay { background: rgba(255, 255, 255, 0.4); }
 
 #compose {
   position: relative;
@@ -95,7 +85,7 @@ body.theme-white #compose-overlay { background: rgba(255, 255, 255, 0.4); }
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
   display: flex; flex-direction: column; gap: 14px;
 }
-body.theme-white #compose {
+body.compose-light #compose {
   background: rgba(255, 255, 255, 0.97); color: #111; border-color: rgba(0, 0, 0, 0.1);
 }
 
@@ -124,9 +114,11 @@ body.theme-white #compose {
 
 .thought-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; padding: 5px 6px 5px 11px; border-radius: 999px;
+  font-size: 13px; padding: 5px 6px 5px 10px; border-radius: 999px;
   background: rgba(128,128,128,0.2);
 }
+.thought-chip.dragging, .body-tag.dragging { opacity: 0.45; }
+.drag-grip { cursor: grab; opacity: 0.4; font-size: 13px; line-height: 1; user-select: none; }
 .thought-chip .x {
   font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 999px;
   border: none; background: rgba(0,0,0,0.18); color: inherit; cursor: none;
@@ -157,7 +149,7 @@ body.theme-white #compose {
   transition: opacity 0.12s ease;
 }
 .bdot:hover .bdot-label, .bdot.near .bdot-label, .bdot.on .bdot-label { opacity: 1; }
-body.theme-white .bdot-label { background: rgba(45,45,60,0.95); }
+body.compose-light .bdot-label { background: rgba(45,45,60,0.95); }
 
 /* crowded head senses → one cluster that opens see / smell / taste together */
 .bface { position: absolute; }
@@ -172,7 +164,7 @@ body.theme-white .bdot-label { background: rgba(45,45,60,0.95); }
   font-family: inherit; font-size: 11px; white-space: nowrap; padding: 4px 10px; border-radius: 999px;
   border: 1px solid rgba(255,205,110,0.7); background: rgba(20,20,30,0.92); color: #fff; cursor: pointer;
 }
-body.theme-white .bface-chip { background: rgba(45,45,60,0.95); }
+body.compose-light .bface-chip { background: rgba(45,45,60,0.95); }
 .bface-chip.on { background: #ff9b6b; border-color: #ff9b6b; color: #fff; }
 
 .bodymap-side { flex: 1 1 auto; min-width: 0; }
@@ -181,22 +173,36 @@ body.theme-white .bface-chip { background: rgba(45,45,60,0.95); }
 @keyframes bodyhint-flash { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; color: #ff9b6b; } }
 #body-tags { display: flex; flex-direction: column; gap: 8px; }
 .body-tag { background: rgba(128,128,128,0.12); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
-.body-tag-head { display: flex; align-items: center; justify-content: space-between; }
-.body-tag-name { font-weight: 600; font-size: 13px; }
+.body-tag-head { display: flex; align-items: center; gap: 6px; }
+.body-tag-name { font-weight: 600; font-size: 13px; flex: 1; }
 .body-tag .x { border: none; background: rgba(0,0,0,0.18); color: inherit; border-radius: 999px; padding: 1px 7px; cursor: pointer; font-size: 13px; line-height: 1; }
 .body-tag input { width: 100%; font-family: inherit; font-size: 13px; padding: 6px 9px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.4); background: rgba(128,128,128,0.1); color: inherit; }
 .body-tag input::placeholder { color: inherit; opacity: 0.4; }
 
-/* Russell circumplex mood map */
-#circumplex { display: flex; flex-direction: column; gap: 4px; }
-.cx-axis { font-size: 11px; opacity: 0.5; text-align: center; }
-.cx-mid { display: flex; align-items: stretch; gap: 6px; }
-.cx-side { writing-mode: vertical-rl; display: flex; align-items: center; justify-content: center; opacity: 0.5; font-size: 11px; }
-.cx-mid .cx-side:first-of-type { transform: rotate(180deg); }
-.cx-grid { flex: 1; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+/* Russell circumplex mood map — four boxes with axis arrows + icons in the gutters */
+#circumplex { position: relative; padding: 8px; --cx-line: rgba(128,128,128,0.5); }
+.cx-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 50px; }
+
+/* axis arrows (double-headed) along the central cross gutter, between the icons */
+.cx-axis-v, .cx-axis-h { position: absolute; background: var(--cx-line); pointer-events: none; }
+.cx-axis-v { left: 50%; top: 48px; bottom: 48px; width: 2px; margin-left: -1px; }
+.cx-axis-h { top: 50%; left: 48px; right: 48px; height: 2px; margin-top: -1px; }
+.cx-axis-v::before, .cx-axis-v::after, .cx-axis-h::before, .cx-axis-h::after { content: ""; position: absolute; width: 0; height: 0; }
+.cx-axis-v::before { top: -7px; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--cx-line); }
+.cx-axis-v::after  { bottom: -7px; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--cx-line); }
+.cx-axis-h::before { left: -7px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 7px solid var(--cx-line); }
+.cx-axis-h::after  { right: -7px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--cx-line); }
+
+/* the four mood icons sit in the gutter ends, fully inside the box area (never outside) */
+.cx-ico { position: absolute; width: 26px; height: 26px; }
+.cx-ico-top    { top: 13px;  left: 50%; transform: translateX(-50%); }
+.cx-ico-bottom { bottom: 13px; left: 50%; transform: translateX(-50%); }
+.cx-ico-left   { left: 13px;  top: 50%; transform: translateY(-50%); }
+.cx-ico-right  { right: 13px; top: 50%; transform: translateY(-50%); }
+
 .cx-cell {
-  border-radius: 10px; padding: 8px; min-height: 78px;
-  display: flex; flex-wrap: wrap; gap: 5px; align-content: flex-start; cursor: pointer;
+  border-radius: 12px; padding: 12px; min-height: 132px;
+  display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; cursor: pointer;
 }
 .cx-cell[data-q="tl"] { background: #FAECE7; }
 .cx-cell[data-q="tr"] { background: #FAEEDA; }
@@ -229,9 +235,14 @@ body.theme-white .bface-chip { background: rgba(45,45,60,0.95); }
 
 #wand {
   position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
-  width: 250px; height: 250px; will-change: transform;
+  width: 120px; height: 120px; will-change: transform;   /* JS animates this 120 ↔ 250 */
 }
 #wand.hidden, #twinkle.hidden { display: none; }
+
+/* reduced-motion / e-ink: no continuous glow or pulsing (the trail + sparkles are
+   skipped in JS; this covers the CSS animations) */
+body.reduce-motion #twinkle { display: none; }
+body.reduce-motion .summon-star { animation: summon-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
 
 /* the star you summon by shaking — click it to open the compose panel */
 .summon-star {

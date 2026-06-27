@@ -54,29 +54,41 @@ async function saveWindowMonths(n) {
   await chrome.storage.sync.set({ reflectWindowMonths: n === REFLECT_MAX_MONTHS ? REFLECT_MAX_MONTHS : REFLECT_MIN_MONTHS });
 }
 
+// Reduced-motion / e-ink mode: turn off the wand trail, sparkles, and twinkle.
+async function loadReduceMotion() {
+  const { reflectReduceMotion } = await chrome.storage.sync.get("reflectReduceMotion");
+  return !!reflectReduceMotion;
+}
+async function saveReduceMotion(on) {
+  await chrome.storage.sync.set({ reflectReduceMotion: !!on });
+}
+
 // --- star derivation ---
 // Flatten the log into one star per thought / body / mood within the window.
+// One headline string for a reflection's star: the top (first) thought; else all
+// moods joined by a dot; else the body feelings. (mood/body may be legacy formats.)
+function reflectionStarText(entry) {
+  if (!entry) return "";
+  const thoughts = (entry.thoughts || []).map((t) => (t || "").trim()).filter(Boolean);
+  if (thoughts.length) return thoughts[0];
+  const moods = Array.isArray(entry.mood) ? entry.mood.filter(Boolean) : (entry.mood ? [entry.mood] : []);
+  if (moods.length) return moods.join(" · ");
+  const bodyItems = Array.isArray(entry.body) ? entry.body : (entry.body ? [{ part: "", note: entry.body }] : []);
+  return bodyItems
+    .map((b) => (b.part ? (b.note ? b.part + ": " + b.note : b.part) : (b.note || "")))
+    .filter(Boolean).join(" · ");
+}
+
+// Each reflection is ONE star within the window.
 function reflectionStars(log, windowMonths, nowTs) {
   const windowMs = windowMonths * 30 * 24 * 60 * 60 * 1000;
   const start = nowTs - windowMs;
   const stars = [];
   for (const entry of log) {
     if (!entry || entry.ts < start) continue;
-    const add = (kind, text, idx) => {
-      const t = (text || "").trim();
-      if (!t) return;
-      stars.push({ id: entry.id + ":" + kind + ":" + idx, kind, text: t, ts: entry.ts });
-    };
-    (entry.thoughts || []).forEach((t, i) => add("thought", t, i));
-    // body may be a legacy string OR an array of { part, note } tags
-    const bodyItems = Array.isArray(entry.body)
-      ? entry.body
-      : (entry.body ? [{ part: "", note: entry.body }] : []);
-    bodyItems.forEach((b, i) => {
-      const txt = b.part ? (b.note ? b.part + " — " + b.note : b.part) : (b.note || "");
-      add("body", txt, i);
-    });
-    add("mood", entry.mood, 0);
+    const text = reflectionStarText(entry);
+    if (!text) continue;                 // nothing logged → no star
+    stars.push({ id: entry.id, text, ts: entry.ts });
   }
   return { stars, start, end: nowTs };
 }

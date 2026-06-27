@@ -196,16 +196,18 @@ window.addEventListener("keydown", (e) => {
   if (e.key === "Enter" && document.activeElement !== minsEl && document.activeElement !== sessionEl) proceed();
 });
 
-function proceed() {
+async function proceed() {
   if (!targetUrl) return;
   setValue(parseInt(minsEl.value, 10));
   setSession(parseInt(sessionEl.value, 10));
-  const url = chrome.runtime.getURL("pause.html") +
-    "?url=" + encodeURIComponent(targetUrl) +
-    "&group=" + encodeURIComponent(groupId) +
-    "&break=" + value +
-    "&session=" + sessionValue;
-  location.replace(url);
+  // The hold-to-countdown already happened — commit is the last step, so unlock now
+  // with the committed break length + session (shared across the whole group).
+  try {
+    await chrome.runtime.sendMessage({
+      type: "grantAllowance", groupId, breakMinutes: value, allowanceMinutes: sessionValue
+    });
+  } catch (e) {}
+  location.replace(targetUrl);
 }
 
 (async function init() {

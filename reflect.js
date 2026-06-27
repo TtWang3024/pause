@@ -3,7 +3,7 @@ const targetUrl = params.get("url");
 const groupId = params.get("group") || "";
 
 const trailCanvas = document.getElementById("trail");
-const starmapEl = document.getElementById("starmap");
+const skymapCanvas = document.getElementById("skymap");
 const tooltipEl = document.getElementById("tooltip");
 const composeOverlay = document.getElementById("compose-overlay");
 const composeClose = document.getElementById("compose-close");
@@ -20,7 +20,9 @@ const saveBtn = document.getElementById("save-btn");
 const continueBtn = document.getElementById("continue-btn");
 const winToggle = document.getElementById("window-toggle");
 
-const WAND_SIZE = 250;
+const WAND_SMALL = 120;             // resting size on the star map (uses images/wand-120.png)
+const WAND_LARGE = 250;             // when you shake to summon a star (uses images/wand.png)
+let wandSize = WAND_SMALL;          // current size, animated between the two
 // ===== Tunables — tweak these numbers and reload to taste =====
 const TIP_X = 0.36, TIP_Y = 0.25;   // wand star hotspot (fraction of the image) — where the pointer sits on the wand
 const TRAIL_OFFSET_X = -6;          // shift the trail from the pointer: negative = LEFT
@@ -53,10 +55,21 @@ const BODY_MAX = 3;
 let bodyDotEls = [];
 let bodyFaceEl = null;
 let bodyFaceOpen = false;   // hysteresis so the face popover stays open while you reach its chips
-let selectedMood = "";
+let selectedMoods = [];     // [{ q, name }] — up to MOOD_MAX, ranked on save
+const MOOD_MAX = 3;
+// rank order: positive-high, negative-high, positive-low, negative-low; then A–Z within a quadrant
+const MOOD_Q_RANK = { tr: 0, tl: 1, br: 2, bl: 3 };
 let windowMonths = 1;
 let reflectionLog = [];
 let feelings = {};
+
+let reduceMotion = false;   // e-ink / reduced-motion: no trail, sparkles, or twinkle
+
+// planetarium sky + its drag-to-pan state
+let sky = null;
+let skyDragging = false;
+let skyLastX = 0, skyLastY = 0;
+let skyRaf = 0;             // coalesces pan/zoom redraws to one per animation frame
 
 // ---------- fallback art (used until/if a PNG is missing) ----------
 function svgUri(svg) { return "data:image/svg+xml," + encodeURIComponent(svg); }
@@ -78,23 +91,6 @@ const STAR_COUNT = 21;
 const STAR_SRCS = Array.from({ length: STAR_COUNT }, (_, i) => "images/stars-" + String(i + 1).padStart(3, "0") + ".png");
 function starSrc(i) {
   try { return chrome.runtime.getURL(STAR_SRCS[i]); } catch (e) { return STAR_SRCS[i]; }
-}
-
-// ---------- theme ----------
-function applyBackground(bg) {
-  if (!bg) return;
-  if (bg.type === "preset") {
-    document.body.classList.toggle("theme-white", bg.value === "white");
-  } else if (bg.type === "custom" && bg.value) {
-    document.body.style.background = bg.value;
-    document.body.style.color = isLightColor(bg.value) ? "#000" : "#fff";
-  }
-}
-function isLightColor(hex) {
-  const m = /^#?([0-9a-f]{6})$/i.exec((hex || "").trim());
-  if (!m) return false;
-  const v = parseInt(m[1], 16);
-  return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) > 160;
 }
 
 // ---------- wand visibility (native cursor over UI / while the modal is open) ----------
@@ -126,7 +122,7 @@ function onMove(e) {
 
   // Queue trailing-ribbon targets ONLY (wand PNG + twinkle stay live below, zero lag).
   // Capture every native sub-frame point so a fast flick integrates the true path.
-  if (!uiActive()) {
+  if (!uiActive() && !reduceMotion) {
     const coalesced = (typeof e.getCoalescedEvents === "function") ? e.getCoalescedEvents() : null;
     if (coalesced && coalesced.length) {
       for (let i = 0; i < coalesced.length; i++) {
@@ -138,10 +134,10 @@ function onMove(e) {
     }
   }
 
-  wandEl.style.transform = `translate(${curX - TIP_X * WAND_SIZE}px, ${curY - TIP_Y * WAND_SIZE}px)`;
+  wandEl.style.transform = `translate(${curX - TIP_X * wandSize}px, ${curY - TIP_Y * wandSize}px)`;
   twinkleEl.style.setProperty("--pos", `translate(${curX}px, ${curY}px)`);
 
-  if (!uiActive() && distAccum > 46) {
+  if (!uiActive() && !reduceMotion && distAccum > 46) {
     distAccum = 0;
     pendingSparkles.push({
       x: curX + TRAIL_OFFSET_X + (Math.random() * 2 - 1) * 22,
@@ -154,7 +150,7 @@ function onMove(e) {
   const t = e.timeStamp;
   shakeMoves.push({ t, x: curX, y: curY });
   while (shakeMoves.length && t - shakeMoves[0].t > 450) shakeMoves.shift();
-  if (!modalOpen && !centerStar && t - lastSummon > 3500 && shakeMoves.length >= 6) {
+  if (!modalOpen && !centerStar && !skyDragging && t - lastSummon > 3500 && shakeMoves.length >= 6) {
     let path = 0;
     for (let i = 1; i < shakeMoves.length; i++) {
       path += Math.hypot(shakeMoves[i].x - shakeMoves[i - 1].x, shakeMoves[i].y - shakeMoves[i - 1].y);
@@ -163,11 +159,44 @@ function onMove(e) {
     const net = Math.hypot(b.x - a.x, b.y - a.y);
     if (path > 650 && net < path * 0.45) { lastSummon = t; summonStar(); }
   }
+
+  // hover one of your reflection-stars → show its note + the real star's name
+  if (sky && sky.isLoaded() && !skyDragging && !uiActive()) {
+    const info = sky.hitTest(curX, curY);
+    if (info) showTip(info.text, formatDateTime(info.ts) + " · " + info.name, curX, curY);
+    else hideTip();
+  }
 }
 window.addEventListener("pointermove", onMove, { passive: true });
 
+// Grow the wand to WAND_LARGE while a summoned star is on screen; shrink back after.
+// Animated per-frame (repositioning each step) so the tip stays pinned to the cursor.
+let wandAnim = null;
+function growWand(big) {
+  const target = big ? WAND_LARGE : WAND_SMALL;
+  wandEl.src = big ? "images/wand.png" : "images/wand-120.png";
+  if (reduceMotion) {                       // instant, no animation, on e-ink
+    wandSize = target;
+    wandEl.style.width = target + "px"; wandEl.style.height = target + "px";
+    if (curX > -200) wandEl.style.transform = `translate(${curX - TIP_X * wandSize}px, ${curY - TIP_Y * wandSize}px)`;
+    return;
+  }
+  const start = wandSize, t0 = performance.now(), dur = 170;
+  if (wandAnim) cancelAnimationFrame(wandAnim);
+  function step(now) {
+    const k = Math.min(1, (now - t0) / dur);
+    wandSize = start + (target - start) * (1 - Math.pow(1 - k, 3));   // ease-out
+    wandEl.style.width = wandSize + "px";
+    wandEl.style.height = wandSize + "px";
+    if (curX > -200) wandEl.style.transform = `translate(${curX - TIP_X * wandSize}px, ${curY - TIP_Y * wandSize}px)`;
+    if (k < 1) wandAnim = requestAnimationFrame(step);
+  }
+  wandAnim = requestAnimationFrame(step);
+}
+
 function summonStar() {
   if (centerStar) return;
+  growWand(true);                       // magic activates → wand grows large
   const img = document.createElement("img");
   img.className = "summon-star";
   img.alt = ""; img.title = "Open a reflection";
@@ -182,6 +211,7 @@ function summonStar() {
     clearTimeout(centerStar._t);
     centerStar.remove();
     centerStar = null;
+    growWand(false);                    // shrink back to the resting size
     overUI = false; updateWand();
   };
   img.addEventListener("click", () => { dismiss(); openCompose(); });
@@ -339,46 +369,51 @@ function trailFrame() {
   requestAnimationFrame(trailFrame);
 }
 
-window.addEventListener("resize", () => { setupCanvas(); washFromBg(); renderStars(); });
+window.addEventListener("resize", () => { setupCanvas(); if (sky) sky.setSize(); washFromBg(); renderStars(); });
 
-// ---------- star map ----------
+// ---------- star map (real planetarium sky; reflections pinned to real stars) ----------
 function renderStars() {
-  starmapEl.innerHTML = "";
-  const { stars, start, end } = reflectionStars(reflectionLog, windowMonths, Date.now());
-  const small = window.innerWidth < 600;
-  const useImages = stars.length <= (small ? 100 : 500);
-  const pad = 46;
-
-  for (const s of stars) {
-    const pos = starPosition(s.id, window.innerWidth, window.innerHeight, pad);
-    const r = recencyFrac(s.ts, start, end);
-    const op = (0.3 + r * 0.7).toFixed(2);
-    let el;
-    if (useImages) {
-      const size = 10 + r * 26;
-      const idx = starImageIndex(s.id, STAR_SRCS.length);
-      el = document.createElement("img");
-      el.className = "star";
-      el.src = starSrc(idx);
-      el.addEventListener("error", () => { el.src = STAR_FALLBACKS[idx % STAR_FALLBACKS.length]; }, { once: true });
-      el.style.width = size + "px";
-      el.style.height = size + "px";
-    } else {
-      const d = (2 + r * 5) * 2;
-      el = document.createElement("div");
-      el.className = "star-dot";
-      el.style.width = d + "px";
-      el.style.height = d + "px";
-    }
-    el.style.left = pos.x + "px";
-    el.style.top = pos.y + "px";
-    el.style.opacity = op;
-    const text = s.text, when = formatDateTime(s.ts);
-    el.addEventListener("mouseenter", () => showTip(text, when, pos.x, pos.y));
-    el.addEventListener("mouseleave", hideTip);
-    starmapEl.appendChild(el);
-  }
+  if (!sky || !sky.isLoaded()) return;
+  const { stars } = reflectionStars(reflectionLog, windowMonths, Date.now());
+  sky.setReflections(stars, windowMonths, Date.now());
+  sky.render(false);
 }
+
+// drag to pan the dome, wheel to zoom
+function onSkyDown(e) {
+  if (uiActive()) return;
+  skyDragging = true;
+  skyLastX = e.clientX; skyLastY = e.clientY;
+  try { skymapCanvas.setPointerCapture(e.pointerId); } catch (_) {}
+}
+function scheduleSky(fast) {            // many pointermove/wheel events → one redraw per frame
+  if (skyRaf) return;
+  skyRaf = requestAnimationFrame(() => { skyRaf = 0; if (sky) sky.render(fast); });
+}
+function onSkyDrag(e) {
+  if (!skyDragging || !sky) return;
+  sky.pan(e.clientX - skyLastX, e.clientY - skyLastY);
+  skyLastX = e.clientX; skyLastY = e.clientY;
+  hideTip();
+  scheduleSky(true);                      // fast (stars + lines) while dragging
+}
+function onSkyUp(e) {
+  if (!skyDragging) return;
+  skyDragging = false;
+  try { skymapCanvas.releasePointerCapture(e.pointerId); } catch (_) {}
+  if (skyRaf) { cancelAnimationFrame(skyRaf); skyRaf = 0; }   // drop a pending fast frame
+  if (sky) sky.render(false);             // full render (Milky Way + labels) on settle
+}
+function onSkyWheel(e) {
+  if (uiActive() || !sky) return;
+  e.preventDefault();
+  sky.zoomBy(e.deltaY < 0 ? 1.12 : 1 / 1.12);
+  scheduleSky(false);
+}
+skymapCanvas.addEventListener("pointerdown", onSkyDown);
+skymapCanvas.addEventListener("pointermove", onSkyDrag);
+window.addEventListener("pointerup", onSkyUp);
+skymapCanvas.addEventListener("wheel", onSkyWheel, { passive: false });
 function showTip(text, when, x, y) {
   tooltipEl.innerHTML = "";
   tooltipEl.append(document.createTextNode(text));
@@ -392,16 +427,40 @@ function showTip(text, when, x, y) {
 function hideTip() { tooltipEl.classList.add("hidden"); }
 
 // ---------- compose ----------
+// Drag `handle` to reorder `list`; `target` gets the .dragging class and is the drop zone.
+function makeReorderable(handle, target, list, index, rerender) {
+  handle.draggable = true;
+  handle.addEventListener("dragstart", (e) => {
+    e.dataTransfer.setData("text/plain", String(index));
+    e.dataTransfer.effectAllowed = "move";
+    target.classList.add("dragging");
+  });
+  handle.addEventListener("dragend", () => target.classList.remove("dragging"));
+  target.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+  target.addEventListener("drop", (e) => {
+    e.preventDefault();
+    const from = parseInt(e.dataTransfer.getData("text/plain"), 10);
+    if (isNaN(from) || from === index) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(from < index ? index - 1 : index, 0, moved);   // exact drop position
+    rerender();
+  });
+}
+
 function renderThoughtChips() {
   thoughtChips.innerHTML = "";
   thoughts.forEach((t, i) => {
     const chip = document.createElement("span");
     chip.className = "thought-chip";
+    const grip = document.createElement("span");
+    grip.className = "drag-grip"; grip.textContent = "⠿"; grip.title = "Drag to reorder";
+    chip.appendChild(grip);
     chip.append(document.createTextNode(t));
     const x = document.createElement("button");
     x.className = "x"; x.type = "button"; x.textContent = "×";
     x.addEventListener("click", () => { thoughts.splice(i, 1); renderThoughtChips(); });
     chip.appendChild(x);
+    makeReorderable(grip, chip, thoughts, i, renderThoughtChips);   // drag the grip to reorder
     thoughtChips.appendChild(chip);
   });
 }
@@ -429,19 +488,22 @@ function renderBodyTags() {
     row.className = "body-tag";
     const head = document.createElement("div");
     head.className = "body-tag-head";
+    const grip = document.createElement("span");
+    grip.className = "drag-grip"; grip.textContent = "⠿"; grip.title = "Drag to reorder";
     const name = document.createElement("span");
     name.className = "body-tag-name";
     name.textContent = t.part;
     const x = document.createElement("button");
     x.className = "x"; x.type = "button"; x.textContent = "×";
     x.addEventListener("click", () => { bodyTags.splice(i, 1); renderBodyTags(); });
-    head.appendChild(name); head.appendChild(x);
+    head.appendChild(grip); head.appendChild(name); head.appendChild(x);
     const note = document.createElement("input");
-    note.type = "text"; note.autocomplete = "off";
+    note.type = "text"; note.autocomplete = "off"; note.draggable = false;
     note.placeholder = "words for this… (optional)";
     note.value = t.note || "";
     note.addEventListener("input", () => { t.note = note.value; });
     row.appendChild(head); row.appendChild(note);
+    makeReorderable(grip, row, bodyTags, i, renderBodyTags);   // drag the grip to reorder
     bodyTagsEl.appendChild(row);
   });
   syncBodyDots();
@@ -531,6 +593,20 @@ function bindBodyMap() {
   bodyFig.addEventListener("pointerleave", clearBodyNear);
 }
 
+function moodOn(q, name) { return selectedMoods.some((m) => m.q === q && m.name === name); }
+function toggleMood(q, name) {
+  const idx = selectedMoods.findIndex((m) => m.q === q && m.name === name);
+  if (idx >= 0) { selectedMoods.splice(idx, 1); renderCircumplex(); return; }
+  if (selectedMoods.length >= MOOD_MAX) return;   // up to 3
+  selectedMoods.push({ q, name });
+  renderCircumplex();
+}
+function sortedMoods() {                            // rank: quadrant order, then A–Z
+  return selectedMoods.slice().sort((a, b) => {
+    const r = (MOOD_Q_RANK[a.q] ?? 9) - (MOOD_Q_RANK[b.q] ?? 9);
+    return r !== 0 ? r : a.name.localeCompare(b.name);
+  });
+}
 function renderCircumplex() {
   for (const q of QUADRANTS) {
     const cell = circumplexEl.querySelector(`.cx-cell[data-q="${q}"]`);
@@ -538,18 +614,15 @@ function renderCircumplex() {
     const meta = QUADRANT_META[q];
     cell.innerHTML = "";
     for (const name of (feelings[q] || [])) {
+      const on = moodOn(q, name);
       const chip = document.createElement("button");
       chip.type = "button";
-      chip.className = "cx-chip" + (selectedMood === name ? " on" : "");
+      chip.className = "cx-chip" + (on ? " on" : "");
       chip.textContent = name;
       chip.style.color = meta.text;
       chip.style.borderColor = meta.border;
-      if (selectedMood === name) chip.style.background = meta.text;
-      chip.addEventListener("click", (e) => {
-        e.stopPropagation();
-        selectedMood = selectedMood === name ? "" : name;
-        renderCircumplex();
-      });
+      if (on) chip.style.background = meta.text;
+      chip.addEventListener("click", (e) => { e.stopPropagation(); toggleMood(q, name); });
       cell.appendChild(chip);
     }
   }
@@ -581,7 +654,7 @@ function addFeelingInline(cell, q) {
     if (!feelings[q]) feelings[q] = [];
     if (!feelings[q].includes(name)) feelings[q].push(name);
     await saveFeelings(feelings);
-    selectedMood = name;
+    if (!moodOn(q, name) && selectedMoods.length < MOOD_MAX) selectedMoods.push({ q, name });
     renderCircumplex();
   };
   input.addEventListener("keydown", (e) => {
@@ -594,7 +667,7 @@ function addFeelingInline(cell, q) {
 function resetFields() {
   thoughts = []; renderThoughtChips();
   bodyTags = []; renderBodyTags();
-  selectedMood = "";
+  selectedMoods = [];
   renderCircumplex();
 }
 function openCompose() {
@@ -610,8 +683,8 @@ async function saveReflection() {
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
-  const mood = selectedMood;
-  if (thoughts.length || body.length || mood) {
+  const mood = sortedMoods().map((m) => m.name);   // ranked feeling names, up to 3
+  if (thoughts.length || body.length || mood.length) {
     reflectionLog.unshift({ id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood });
     await saveReflectionLog(reflectionLog);
     renderStars();
@@ -627,7 +700,7 @@ composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverla
 function proceed() {
   if (!targetUrl) return;
   location.replace(
-    chrome.runtime.getURL("commit.html") +
+    chrome.runtime.getURL("pause.html") +     // hold-to-countdown now comes before the break commitment
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId)
   );
@@ -656,14 +729,33 @@ nativeCursorZone(winToggle);
 // ---------- init ----------
 (async function init() {
   setupCanvas();
-  requestAnimationFrame(trailFrame);
 
-  wandEl.src = "images/wand.png";
-  wandEl.addEventListener("error", () => { wandEl.src = WAND_FALLBACK; }, { once: true });
+  reduceMotion = (await loadReduceMotion()) ||
+    !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (reduceMotion) document.body.classList.add("reduce-motion");
+  if (!reduceMotion) requestAnimationFrame(trailFrame);   // skip the moving trail on e-ink / reduced motion
 
+  wandEl.style.width = WAND_SMALL + "px";
+  wandEl.style.height = WAND_SMALL + "px";
+  wandEl.src = "images/wand-120.png";   // resting on the star map; grows when you summon a star
+  wandEl.addEventListener("error", () => { wandEl.src = WAND_FALLBACK; });
+
+  // The screen stays a night sky (the planetarium needs darkness), but the compose
+  // panel follows the pause-page theme — a light card on a light theme.
+  const isThemeLight = (bg) => {
+    if (!bg) return false;
+    if (bg.type === "preset") return bg.value === "white";
+    if (bg.type === "custom" && bg.value) {
+      const m = /^#?([0-9a-f]{6})$/i.exec(bg.value.trim());
+      if (!m) return false;
+      const v = parseInt(m[1], 16);
+      return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) > 160;
+    }
+    return false;
+  };
   let settings = null;
   try { settings = await chrome.runtime.sendMessage({ type: "getSettings" }); } catch (e) {}
-  if (settings) applyBackground(settings.background);
+  if (settings && isThemeLight(settings.background)) document.body.classList.add("compose-light");
   washFromBg();
 
   feelings = await ensureSeededFeelings();
@@ -674,5 +766,9 @@ nativeCursorZone(winToggle);
   windowMonths = await loadWindowMonths();
   paintToggle();
   reflectionLog = await loadReflectionLog();
+
+  sky = createSkyMap(skymapCanvas, {});
+  sky.setSize();
+  try { await sky.load((p) => chrome.runtime.getURL(p)); } catch (e) {}
   renderStars();
 })();

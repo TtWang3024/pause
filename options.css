@@ -42,6 +42,7 @@ body {
   align-items: flex-start;
 }
 
+/* vertical segmented control — a light track with a white pill for the active tab */
 .settings-nav {
   flex: 0 0 168px;
   position: sticky;
@@ -49,28 +50,30 @@ body {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 5px;
+  border-radius: 12px;
 }
 
 .nav-btn {
   font-family: 'Baloo 2', sans-serif;
   font-size: 15px;
   font-weight: 500;
-  text-align: left;
-  padding: 11px 14px;
-  border: 1px solid transparent;
-  border-radius: 9px;
+  text-align: center;
+  padding: 9px 14px;
+  border: none;
+  border-radius: 8px;
   background: transparent;
   color: var(--muted);
   cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
 }
-.nav-btn:hover { background: rgba(0, 0, 0, 0.04); color: var(--fg); }
+.nav-btn:hover { color: var(--fg); }
 .nav-btn.active {
   background: #fff;
   color: var(--fg);
-  border-color: var(--border);
   font-weight: 600;
-  box-shadow: inset 3px 0 0 var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
 }
 
 .settings-content {
@@ -449,30 +452,94 @@ hr {
   text-align: right;
 }
 
+/* edit / delete / save / cancel row actions — bare icons, no box */
 .act-edit,
-.break-edit {
-  font-size: 13px;
-  padding: 5px 12px;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(0, 0, 0, 0.12);
-}
-
+.break-edit,
 .act-delete,
-.break-delete {
-  font-size: 16px;
-  line-height: 1;
-  padding: 4px 9px;
-  color: var(--danger);
-  background: rgba(255, 255, 255, 0.7);
-  border: 1px solid rgba(185, 28, 28, 0.35);
+.break-delete,
+.act-save,
+.act-cancel,
+.delete-group {
+  padding: 4px;
+  background: none;
+  border: none;
+  line-height: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.12s ease, background 0.12s ease;
+}
+.act-edit:hover,
+.break-edit:hover,
+.act-delete:hover,
+.break-delete:hover,
+.act-save:hover,
+.act-cancel:hover,
+.delete-group:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.05);
 }
 
-.act-save,
-.act-cancel {
-  font-size: 13px;
-  padding: 5px 10px;
-  background: #fff;
+/* groups as a horizontal segmented control — one editor shown at a time */
+.group-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 5px;
+  border-radius: 12px;
+  margin-bottom: 16px;
 }
+.group-tab {
+  font-family: 'Baloo 2', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 7px 16px;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, box-shadow 0.12s ease;
+}
+.group-tab:hover { color: var(--fg); }
+.group-tab.active {
+  background: #fff;
+  color: var(--fg);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 0 0 0.5px rgba(0, 0, 0, 0.04);
+}
+.group-tab-add {
+  font-size: 18px; line-height: 1;
+  padding: 6px 14px;
+  border: none; border-radius: 8px;
+  background: transparent; color: var(--muted); cursor: pointer;
+}
+.group-tab-add:hover { background: rgba(0, 0, 0, 0.06); color: var(--fg); }
+.group-hidden { display: none; }
+.btn-icon { width: 20px; height: 20px; display: block; pointer-events: none; }
+
+/* main Save — large labelled button with icon */
+.save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 16px;
+  padding: 11px 22px;
+}
+.save-ico { width: 22px; height: 22px; pointer-events: none; }
+
+/* add buttons — bare add.png icon */
+.add-icon-btn {
+  padding: 4px; background: none; border: none; border-radius: 8px; cursor: pointer;
+  line-height: 0; opacity: 0.85; transition: opacity 0.12s ease, background 0.12s ease;
+}
+.add-icon-btn:hover { opacity: 1; background: rgba(0, 0, 0, 0.05); }
+.add-icon-btn img { width: 26px; height: 26px; display: block; pointer-events: none; }
 
 .activity-row .edit-name {
   flex: 1;
@@ -580,6 +647,14 @@ hr {
   justify-content: space-between;
 }
 
+/* foldable section (All breaks) */
+.fold-summary { list-style: none; cursor: pointer; user-select: none; }
+.fold-summary::-webkit-details-marker { display: none; }
+.fold-title { display: inline-flex; align-items: baseline; gap: 8px; }
+.fold-chevron { font-size: 12px; color: var(--muted); transition: transform 0.15s ease; }
+details[open] .fold-chevron { transform: rotate(90deg); }
+#breaks-fold #breaks-list { margin-top: 14px; }
+
 .breaks-count {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 13px;
@@ -664,9 +739,12 @@ hr {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .break-add-select {
+  flex: 1;
+  min-width: 120px;
   font-family: inherit;
   font-size: 13px;
   padding: 5px 7px;
@@ -729,6 +807,7 @@ hr {
   font-weight: 600;
   margin-bottom: 8px;
 }
+.feel-q-ico { width: 18px; height: 18px; vertical-align: middle; margin: 0 3px -3px 1px; }
 
 .feel-chips {
   display: flex;

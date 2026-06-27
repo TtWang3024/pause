@@ -7,7 +7,7 @@
 </head>
 <body>
   <canvas id="trail"></canvas>
-  <div id="starmap"></div>
+  <canvas id="skymap"></canvas>
   <div id="tooltip" class="hidden"></div>
 
   <div id="window-toggle">
@@ -48,18 +48,18 @@
       <div class="field">
         <label>Mood</label>
         <div id="circumplex">
-          <div class="cx-axis cx-top">↑ high arousal</div>
-          <div class="cx-mid">
-            <div class="cx-axis cx-side">unpleasant</div>
-            <div class="cx-grid">
-              <div class="cx-cell" data-q="tl"></div>
-              <div class="cx-cell" data-q="tr"></div>
-              <div class="cx-cell" data-q="bl"></div>
-              <div class="cx-cell" data-q="br"></div>
-            </div>
-            <div class="cx-axis cx-side">pleasant</div>
+          <div class="cx-grid">
+            <div class="cx-cell" data-q="tl"></div>
+            <div class="cx-cell" data-q="tr"></div>
+            <div class="cx-cell" data-q="bl"></div>
+            <div class="cx-cell" data-q="br"></div>
           </div>
-          <div class="cx-axis cx-bottom">↓ low arousal</div>
+          <span class="cx-axis-v" aria-hidden="true"></span>
+          <span class="cx-axis-h" aria-hidden="true"></span>
+          <img class="cx-ico cx-ico-top" src="images/sun.png" alt="high arousal" title="high arousal" />
+          <img class="cx-ico cx-ico-bottom" src="images/moon.png" alt="low arousal" title="low arousal" />
+          <img class="cx-ico cx-ico-left" src="images/cactus.png" alt="unpleasant" title="unpleasant" />
+          <img class="cx-ico cx-ico-right" src="images/lily.png" alt="pleasant" title="pleasant" />
         </div>
       </div>
       <button id="save-btn" class="continue" type="button">Save ✨</button>
@@ -71,6 +71,7 @@
 
   <script src="breaks-common.js"></script>
   <script src="reflections-common.js"></script>
+  <script src="skymap.js"></script>
   <script src="reflect.js"></script>
 </body>
 </html>
