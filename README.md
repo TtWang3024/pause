@@ -187,4 +187,12 @@ Row actions (edit, delete, save, cancel, add) are icons. Break activities and re
 
 - Star data is derived from the **Hipparcos** catalogue via the open **d3-celestial** datasets (MIT / public domain), filtered and bundled under `data/` so the extension runs fully offline.
 - Fonts are **Baloo 2** and **Figtree** under the SIL Open Font License.
-- UI and mood icons are from **Icons8**.
+- Icon credits:
+  - The **save** icon, the **wand**, the **rabbit** body map, and the **star** images are original, made by the author with AI (ChatGPT).
+  - The **edit**, **delete**, **cancel**, and **settings** icons are from [Icons8](https://icons8.com/license).
+  - The mood-axis icons and the **add** (plus) button are from Flaticon, created by Freepik:
+    - [Moon icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/moon)
+    - [Succulent icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/succulent) (cactus)
+    - [Flower icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/flower) (lily)
+    - [Sun icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/sun)
+    - [Plus icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/plus)
