@@ -481,6 +481,7 @@ function renderThoughtChips() {
     makeReorderable(grip, chip, thoughts, i, renderThoughtChips);   // drag the grip to reorder
     thoughtChips.appendChild(chip);
   });
+  refreshSaveLabel();
 }
 thoughtInput.addEventListener("keydown", (e) => {
   if (e.key === "Enter") {
@@ -525,6 +526,7 @@ function renderBodyTags() {
     bodyTagsEl.appendChild(row);
   });
   syncBodyDots();
+  refreshSaveLabel();
 }
 function toggleBodyPart(part) {
   const idx = bodyTags.findIndex((t) => t.part === part);
@@ -662,6 +664,7 @@ function renderCircumplex() {
       cell.appendChild(chip);
     }
   }
+  refreshSaveLabel();
 }
 function bindCircumplexCells() {
   for (const q of QUADRANTS) {
@@ -717,13 +720,21 @@ function closeCompose() {
   if (bottomEl) bottomEl.classList.remove("hide");
   modalOpen = false; updateWand();
 }
+// The Save button is themed: it lights a star when there's something to save, and reads
+// "Continue" when the reflection is empty (then it just proceeds, lighting nothing).
+function reflectionHasContent() {
+  return thoughts.length > 0 || bodyTags.length > 0 || selectedMoods.length > 0;
+}
+function saveLabel() { return reflectionHasContent() ? "Light this star ✨" : "Continue"; }
+function refreshSaveLabel() { if (pauseDone && !celebrating) saveBtn.textContent = saveLabel(); }
+
 async function saveReflection() {
   if (!pauseDone || celebrating) return;           // gated by the countdown; ignore double clicks
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
   const mood = sortedMoods().map((m) => m.name);   // ranked feeling names, up to 3
-  if (!(thoughts.length || body.length || mood.length)) {
+  if (!reflectionHasContent()) {
     resetFields(); closeCompose(); proceed(); return;   // nothing written → behave like Continue
   }
   const entry = { id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood };
@@ -816,14 +827,14 @@ function countdownCanRun() { return !document.hidden && document.hasFocus(); }
 function paintCountdown() {
   if (pauseDone) {
     continueBtn.textContent = "Continue →";
-    saveBtn.textContent = "Save ✨";
+    saveBtn.textContent = saveLabel();
     continueBtn.disabled = false;
     saveBtn.disabled = false;
     return;
   }
   const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
   continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
-  saveBtn.innerHTML = 'Save ✨ (in <span class="cd-num">' + secs + '</span>s)';
+  saveBtn.innerHTML = saveLabel() + ' (in <span class="cd-num">' + secs + '</span>s)';
   continueBtn.disabled = true;
   saveBtn.disabled = true;
 }
