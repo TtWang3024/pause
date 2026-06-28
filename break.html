@@ -6,11 +6,21 @@
   <link rel="stylesheet" href="break.css" />
 </head>
 <body>
-  <div id="corner-timer">00:00</div>
   <main id="stage">
-    <p id="label">You're on a break</p>
+    <p id="label">On a break</p>
     <p id="message"></p>
-    <p id="chosen-echo"></p>
+    <p id="timeline"><span id="time-left">00:00</span> left in your <span id="break-len">break</span></p>
+    <div id="progress"><span id="progress-fill"></span></div>
+
+    <div id="rating">
+      <p id="rating-prompt">Did this give you what you came for?</p>
+      <div id="rating-opts">
+        <button class="rate-opt" type="button" data-v="-1"><span class="rate-glyph">○</span>Not really</button>
+        <button class="rate-opt" type="button" data-v="0"><span class="rate-glyph">◐</span>Some of it</button>
+        <button class="rate-opt" type="button" data-v="1"><span class="rate-glyph">●</span>Yes, that</button>
+      </div>
+      <p id="rating-help">Tap if you like. No wrong answer.</p>
+    </div>
 
     <p id="pick-hint">Pick up to 3 things to do</p>
     <div id="activity-list"></div>
@@ -21,7 +31,7 @@
       <button id="custom-add" title="Add and select">+</button>
     </div>
 
-    <button id="done-btn" disabled>Wait…</button>
+    <button id="done-btn" disabled>Break in progress</button>
     <p id="footnote">The break must finish before you continue.</p>
   </main>
   <script src="breaks-common.js"></script>

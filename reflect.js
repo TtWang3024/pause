@@ -19,6 +19,17 @@ const circumplexEl = document.getElementById("circumplex");
 const saveBtn = document.getElementById("save-btn");
 const continueBtn = document.getElementById("continue-btn");
 const winToggle = document.getElementById("window-toggle");
+const bottomEl = document.getElementById("bottom");
+const composeEl = document.getElementById("compose");
+const celebrateEl = document.getElementById("celebrate");
+const celebrateStar = document.getElementById("celebrate-star");
+const celebrateMsg = document.getElementById("celebrate-msg");
+const celebrateName = document.getElementById("celebrate-name");
+const celebrateContinue = document.getElementById("celebrate-continue");
+
+// The merged pause countdown greys both buttons until it finishes.
+continueBtn.disabled = true;
+saveBtn.disabled = true;
 
 const WAND_SMALL = 120;             // resting size on the star map (uses images/wand-120.png)
 const WAND_LARGE = 250;             // when you shake to summon a star (uses images/wand.png)
@@ -45,7 +56,9 @@ const BODY_POINTS = [
   { part: "feet",         x: 0.601, y: 0.965 }, // (451, 1495)
 ];
 // The crowded head senses share one cluster that fans them out to choose.
-const FACE_CLUSTER = { x: 0.667, y: 0.143, members: ["see", "smell", "taste"] }; // (500, 222)
+const FACE_CLUSTER = { x: 0.667, y: 0.143, members: ["see", "smell", "taste", "head area"] }; // (500, 222)
+// The five senses (plus head area) get the pink "sense" styling.
+const SENSE_PARTS = ["see", "smell", "taste", "head area", "listen", "touch"];
 const NEAR_FRAC = 0.34;             // how close (× figure width) the cursor must be to light a dot
 // ==============================================================
 
@@ -57,7 +70,7 @@ let bodyFaceEl = null;
 let bodyFaceOpen = false;   // hysteresis so the face popover stays open while you reach its chips
 let selectedMoods = [];     // [{ q, name }] — up to MOOD_MAX, ranked on save
 const MOOD_MAX = 3;
-// rank order: positive-high, negative-high, positive-low, negative-low; then A–Z within a quadrant
+// rank order: positive-high, negative-high, positive-low, negative-low; then A-Z within a quadrant
 const MOOD_Q_RANK = { tr: 0, tl: 1, br: 2, bl: 3 };
 let windowMonths = 1;
 let reflectionLog = [];
@@ -68,6 +81,9 @@ let reduceMotion = false;   // e-ink / reduced-motion: no trail, sparkles, or tw
 // planetarium sky + its drag-to-pan state
 let sky = null;
 let skyDragging = false;
+let appSettings = null;     // cached settings (for forceBreak routing on proceed)
+let celebrating = false;    // save celebration playing → hide wand, freeze the sky
+let lastSummonSrc = "";     // the star image you summoned, reused in the celebration
 let skyLastX = 0, skyLastY = 0;
 let skyRaf = 0;             // coalesces pan/zoom redraws to one per animation frame
 
@@ -96,7 +112,7 @@ function starSrc(i) {
 // ---------- wand visibility (native cursor over UI / while the modal is open) ----------
 let overUI = false;     // pointer over a UI control
 let modalOpen = false;  // compose modal showing
-function uiActive() { return overUI || modalOpen; }
+function uiActive() { return overUI || modalOpen || celebrating; }
 function updateWand() {
   const hide = uiActive();
   wandEl.classList.toggle("hidden", hide);
@@ -150,7 +166,7 @@ function onMove(e) {
   const t = e.timeStamp;
   shakeMoves.push({ t, x: curX, y: curY });
   while (shakeMoves.length && t - shakeMoves[0].t > 450) shakeMoves.shift();
-  if (!modalOpen && !centerStar && !skyDragging && t - lastSummon > 3500 && shakeMoves.length >= 6) {
+  if (!modalOpen && !celebrating && !centerStar && !skyDragging && t - lastSummon > 3500 && shakeMoves.length >= 6) {
     let path = 0;
     for (let i = 1; i < shakeMoves.length; i++) {
       path += Math.hypot(shakeMoves[i].x - shakeMoves[i - 1].x, shakeMoves[i].y - shakeMoves[i - 1].y);
@@ -202,6 +218,7 @@ function summonStar() {
   img.alt = ""; img.title = "Open a reflection";
   const n = Math.floor(Math.random() * STAR_SRCS.length);
   img.src = starSrc(n);
+  lastSummonSrc = img.src;
   img.addEventListener("error", () => { img.src = STAR_FALLBACKS[n % STAR_FALLBACKS.length]; }, { once: true });
   centerStar = img;
   document.body.appendChild(img);
@@ -521,6 +538,9 @@ function toggleBodyPart(part) {
   }
   bodyTags.push({ part, note: "" });
   renderBodyTags();
+  // put the caret straight into the new tag's note box so you can type immediately
+  const inputs = bodyTagsEl.querySelectorAll(".body-tag input");
+  if (inputs.length) inputs[inputs.length - 1].focus();
 }
 function makeDot(part, x, y) {
   const dot = document.createElement("button");
@@ -529,6 +549,7 @@ function makeDot(part, x, y) {
   dot.style.left = (x * 100) + "%";
   dot.style.top = (y * 100) + "%";
   dot.dataset.part = part;
+  if (SENSE_PARTS.includes(part)) dot.classList.add("sense");   // pink label for senses
   dot._fx = x; dot._fy = y;
   const lbl = document.createElement("span");
   lbl.className = "bdot-label"; lbl.textContent = part;
@@ -552,15 +573,19 @@ function renderBodyDots() {
   const anchor = document.createElement("span");
   anchor.className = "bdot bface-anchor";
   bodyFaceEl.appendChild(anchor);
-  const pop = document.createElement("div");
-  pop.className = "bface-pop";
+  // head area opens to the LEFT of the dot, the three senses to the RIGHT, so their text never overlaps
+  const popR = document.createElement("div");
+  popR.className = "bface-pop bface-pop-right";
+  const popL = document.createElement("div");
+  popL.className = "bface-pop bface-pop-left";
   for (const m of FACE_CLUSTER.members) {
     const chip = document.createElement("button");
     chip.type = "button"; chip.className = "bface-chip"; chip.textContent = m; chip.dataset.part = m;
     chip.addEventListener("click", (e) => { e.stopPropagation(); toggleBodyPart(m); });
-    pop.appendChild(chip);
+    (m === "head area" ? popL : popR).appendChild(chip);
   }
-  bodyFaceEl.appendChild(pop);
+  bodyFaceEl.appendChild(popR);
+  bodyFaceEl.appendChild(popL);
   bodyDots.appendChild(bodyFaceEl);
   syncBodyDots();
 }
@@ -575,8 +600,18 @@ function onBodyFigMove(e) {
     const dist = Math.hypot(px - d._fx * rect.width, py - d._fy * rect.height);
     if (dist < bestD) { bestD = dist; best = d; }
   }
-  // open the face popover when it's the closest target; keep it open (hysteresis) while reaching the chips
-  bodyFaceOpen = bodyFaceOpen ? (faceDist < near * 1.7) : (faceDist < near && faceDist <= bestD);
+  // Keep the popover open while the pointer is actually over it, so every chip (see / smell /
+  // taste / head area) is reachable without the cluster closing and a body dot popping up under it.
+  let overPop = false;
+  if (bodyFaceOpen && bodyFaceEl) {
+    for (const pop of bodyFaceEl.querySelectorAll(".bface-pop")) {
+      const pr = pop.getBoundingClientRect();
+      if (e.clientX >= pr.left - 10 && e.clientX <= pr.right + 10 &&
+          e.clientY >= pr.top - 10 && e.clientY <= pr.bottom + 10) { overPop = true; break; }
+    }
+  }
+  // open when the cluster is the closest target; stay open while over the popover or near the centre
+  bodyFaceOpen = overPop || (bodyFaceOpen ? (faceDist < near * 1.7) : (faceDist < near && faceDist <= bestD));
   if (bodyFaceEl) bodyFaceEl.classList.toggle("open", bodyFaceOpen);
   bodyDotEls.forEach((d) => d.classList.toggle("near", !bodyFaceOpen && d === best && bestD < near));
 }
@@ -601,7 +636,7 @@ function toggleMood(q, name) {
   selectedMoods.push({ q, name });
   renderCircumplex();
 }
-function sortedMoods() {                            // rank: quadrant order, then A–Z
+function sortedMoods() {                            // rank: quadrant order, then A-Z
   return selectedMoods.slice().sort((a, b) => {
     const r = (MOOD_Q_RANK[a.q] ?? 9) - (MOOD_Q_RANK[b.q] ?? 9);
     return r !== 0 ? r : a.name.localeCompare(b.name);
@@ -620,7 +655,7 @@ function renderCircumplex() {
       chip.className = "cx-chip" + (on ? " on" : "");
       chip.textContent = name;
       chip.style.color = meta.text;
-      chip.style.borderColor = meta.border;
+      chip.style.borderColor = meta.text;
       if (on) chip.style.background = meta.text;
       chip.addEventListener("click", (e) => { e.stopPropagation(); toggleMood(q, name); });
       cell.appendChild(chip);
@@ -672,38 +707,212 @@ function resetFields() {
 }
 function openCompose() {
   composeOverlay.classList.add("open");
+  if (bottomEl) bottomEl.classList.add("hide");   // hide the screen's Continue while a star is open
   modalOpen = true; updateWand();
   thoughtInput.focus();
 }
 function closeCompose() {
   composeOverlay.classList.remove("open");
+  if (bottomEl) bottomEl.classList.remove("hide");
   modalOpen = false; updateWand();
 }
 async function saveReflection() {
+  if (!pauseDone || celebrating) return;           // gated by the countdown; ignore double clicks
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
   const mood = sortedMoods().map((m) => m.name);   // ranked feeling names, up to 3
-  if (thoughts.length || body.length || mood.length) {
-    reflectionLog.unshift({ id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood });
-    await saveReflectionLog(reflectionLog);
-    renderStars();
+  if (!(thoughts.length || body.length || mood.length)) {
+    resetFields(); closeCompose(); proceed(); return;   // nothing written → behave like Continue
   }
-  resetFields();
-  closeCompose();
+  const entry = { id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood };
+  reflectionLog.unshift(entry);
+  await saveReflectionLog(reflectionLog);
+  renderStars();                                   // re-place: the new star is now in the sky
+  await clearPauseRemaining();
+  celebrate(entry.id);
 }
 saveBtn.addEventListener("click", saveReflection);
+
+// The compose shrinks into the summoned star, which is then carried to its real
+// place in the sky; its real name and a thank-you line fade in. A "Continue" goes on.
+// Reduced-motion users get the same moment without the scale pop or the eased pan.
+function celebrate(id) {
+  if (celebrating) return;
+  celebrating = true;
+  document.body.classList.add("celebrating");   // restore a normal cursor (the wand is hidden now)
+  saveBtn.disabled = true; continueBtn.disabled = true;   // no second submit
+  modalOpen = false;
+  updateWand();
+  hideTip();
+  const ref = sky ? sky.getRef(id) : null;
+
+  const reveal = () => {
+    if (!reduceMotion) { celebrateStar.classList.remove("pop"); celebrateStar.classList.add("settle"); }
+    celebrateName.textContent = ref ? ref.name : "in your sky";
+    celebrateMsg.classList.add("show");
+    celebrateContinue.classList.add("show");
+  };
+
+  const land = () => {
+    if (lastSummonSrc) celebrateStar.src = lastSummonSrc;
+    celebrateEl.classList.remove("hidden");
+    celebrateStar.classList.remove("pop", "settle", "static");
+    if (reduceMotion) {
+      celebrateStar.classList.add("static");        // present at full size, no scale pop
+      if (ref && sky) { sky.setCenter(ref.ra, ref.dec); sky.render(false); }
+      setTimeout(reveal, 250);
+    } else {
+      void celebrateStar.offsetWidth;               // restart the pop keyframes
+      celebrateStar.classList.add("pop");
+      if (ref && sky && sky.animateTo) sky.animateTo(ref.ra, ref.dec, 1400, reveal);
+      else setTimeout(reveal, 500);
+    }
+  };
+
+  if (reduceMotion) {
+    composeOverlay.classList.remove("open");        // no shrink animation on e-ink
+    land();
+  } else {
+    composeEl.classList.add("shrink");              // shrink the card toward the centre
+    setTimeout(() => {
+      composeOverlay.classList.remove("open");
+      composeEl.classList.remove("shrink");
+      land();
+    }, 480);
+  }
+}
+// Return to the live screen when there is nowhere to go (e.g. opened without a target),
+// so the wand and the shake-to-summon keep working instead of leaving you stuck here.
+function dismissCelebration() {
+  celebrating = false;
+  document.body.classList.remove("celebrating");
+  celebrateEl.classList.add("hidden");
+  celebrateStar.classList.remove("pop", "settle", "static");
+  celebrateMsg.classList.remove("show");
+  celebrateContinue.classList.remove("show");
+  resetFields();
+  if (bottomEl) bottomEl.classList.remove("hide");
+  updateWand();
+}
+celebrateContinue.addEventListener("click", () => { if (targetUrl) proceed(); else dismissCelebration(); });
 composeClose.addEventListener("click", () => { resetFields(); closeCompose(); });
 composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) { resetFields(); closeCompose(); } });
 
-// ---------- continue (skip to the break-length screen) ----------
-function proceed() {
-  if (!targetUrl) return;
-  location.replace(
-    chrome.runtime.getURL("pause.html") +     // hold-to-countdown now comes before the break commitment
-    "?url=" + encodeURIComponent(targetUrl) +
-    "&group=" + encodeURIComponent(groupId)
-  );
+// ---------- merged pause countdown (replaces the separate hold page) ----------
+// Both Continue and Save stay grey, showing "(in Ns)", until this counts down the
+// group's pause length. It pauses when the page loses focus and resumes where it
+// left off (persisted per group, so a reload resumes too).
+let pauseTotalMs = 10000;
+let pauseRemaining = 10000;
+let pauseDone = false;
+let pauseRaf = 0;
+let pauseLastTick = 0;
+let pauseReady = false;     // true once the persisted remaining is loaded (guards early saves)
+
+function countdownCanRun() { return !document.hidden && document.hasFocus(); }
+
+function paintCountdown() {
+  if (pauseDone) {
+    continueBtn.textContent = "Continue →";
+    saveBtn.textContent = "Save ✨";
+    continueBtn.disabled = false;
+    saveBtn.disabled = false;
+    return;
+  }
+  const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
+  continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
+  saveBtn.innerHTML = 'Save ✨ (in <span class="cd-num">' + secs + '</span>s)';
+  continueBtn.disabled = true;
+  saveBtn.disabled = true;
+}
+
+function finishCountdown() {
+  pauseRemaining = 0;
+  pauseDone = true;
+  if (pauseRaf) { cancelAnimationFrame(pauseRaf); pauseRaf = 0; }
+  paintCountdown();
+  savePauseRemaining(0);
+}
+
+function tickCountdown(now) {
+  pauseRaf = 0;
+  if (pauseDone) return;
+  if (!countdownCanRun()) return;            // focus lost mid-frame → stop (resumes on focus)
+  const dt = now - pauseLastTick;
+  pauseLastTick = now;
+  pauseRemaining -= dt;
+  if (pauseRemaining <= 0) { finishCountdown(); return; }
+  paintCountdown();
+  pauseRaf = requestAnimationFrame(tickCountdown);
+}
+
+function startCountdown() {
+  if (pauseDone || pauseRaf || !countdownCanRun()) return;
+  pauseLastTick = performance.now();
+  pauseRaf = requestAnimationFrame(tickCountdown);
+}
+
+function haltCountdown() {                    // focus lost → freeze and remember where we are
+  if (pauseRaf) { cancelAnimationFrame(pauseRaf); pauseRaf = 0; }
+  if (pauseReady && !pauseDone) savePauseRemaining(pauseRemaining);
+}
+
+async function loadPauseRemaining(totalMs) {
+  try {
+    const { pauseCountdowns = {} } = await chrome.storage.local.get("pauseCountdowns");
+    const v = pauseCountdowns[groupId];
+    if (typeof v === "number" && v >= 0 && v <= totalMs) return v;
+  } catch (e) {}
+  return totalMs;
+}
+async function savePauseRemaining(ms) {
+  if (!groupId) return;
+  try {
+    const { pauseCountdowns = {} } = await chrome.storage.local.get("pauseCountdowns");
+    pauseCountdowns[groupId] = Math.max(0, Math.round(ms));
+    await chrome.storage.local.set({ pauseCountdowns });
+  } catch (e) {}
+}
+async function clearPauseRemaining() {
+  if (!groupId) return;
+  try {
+    const { pauseCountdowns = {} } = await chrome.storage.local.get("pauseCountdowns");
+    delete pauseCountdowns[groupId];
+    await chrome.storage.local.set({ pauseCountdowns });
+  } catch (e) {}
+}
+
+window.addEventListener("blur", haltCountdown);
+window.addEventListener("focus", startCountdown);
+document.addEventListener("visibilitychange", () => { if (document.hidden) haltCountdown(); else startCountdown(); });
+window.addEventListener("pagehide", () => { if (pauseReady && !pauseDone) savePauseRemaining(pauseRemaining); });
+
+async function initCountdown() {
+  const grp = appSettings && appSettings.groups
+    ? appSettings.groups.find((g) => g.id === groupId) : null;
+  pauseTotalMs = (grp && grp.pauseSeconds ? grp.pauseSeconds : 10) * 1000;
+  pauseRemaining = await loadPauseRemaining(pauseTotalMs);
+  pauseReady = true;
+  pauseDone = pauseRemaining <= 0;
+  paintCountdown();
+  startCountdown();
+}
+
+// ---------- continue / proceed (the countdown gates this) ----------
+async function proceed() {
+  if (!targetUrl || !pauseDone) return;
+  await clearPauseRemaining();
+  if (appSettings && appSettings.forceBreak) {
+    location.replace(
+      chrome.runtime.getURL("commit.html") +    // a break is enforced → commit its length next
+      "?url=" + encodeURIComponent(targetUrl) +
+      "&group=" + encodeURIComponent(groupId)
+    );
+    return;
+  }
+  try { await chrome.runtime.sendMessage({ type: "grantAllowance", groupId }); } catch (e) {}
+  location.replace(targetUrl);
 }
 continueBtn.addEventListener("click", proceed);
 
@@ -755,8 +964,10 @@ nativeCursorZone(winToggle);
   };
   let settings = null;
   try { settings = await chrome.runtime.sendMessage({ type: "getSettings" }); } catch (e) {}
+  appSettings = settings;
   if (settings && isThemeLight(settings.background)) document.body.classList.add("compose-light");
   washFromBg();
+  await initCountdown();
 
   feelings = await ensureSeededFeelings();
   bindCircumplexCells();

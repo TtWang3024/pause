@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Hold to Pause — Settings</title>
+  <title>Hold to Pause Settings</title>
   <link rel="stylesheet" href="options.css" />
 </head>
 <body>
@@ -19,7 +19,7 @@
 
   <div class="settings-layout">
     <nav class="settings-nav" id="settings-nav">
-      <button class="nav-btn active" data-panel="pause" type="button">Pause</button>
+      <button class="nav-btn active" data-panel="pause" type="button">General</button>
       <button class="nav-btn" data-panel="break" type="button">Break</button>
       <button class="nav-btn" data-panel="magic" type="button">Magic stars</button>
     </nav>
@@ -29,7 +29,7 @@
       <div class="settings-panel active" data-panel="pause">
         <section>
           <h2>Groups</h2>
-          <p class="help">Each group has its own pause length. Add sites as domains, one per line — subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
+          <p class="help">Each group has its own pause length. Add sites as domains, one per line. Subdomains match automatically (e.g. <code>youtube.com</code> covers <code>m.youtube.com</code>).</p>
           <div id="group-tabs" class="group-tabs"></div>
           <div id="groups"></div>
         </section>
@@ -41,6 +41,14 @@
             <span>Reset timer when I release the mouse</span>
           </label>
           <p class="help">Off: releasing pauses the timer where it is. On: releasing snaps it back to full.</p>
+        </section>
+
+        <section>
+          <h2>Session length</h2>
+          <label>Allow visits to the same site freely for the next
+            <input id="allowance" type="number" min="3" max="25" step="1" /> minutes (3 to 25).
+          </label>
+          <p class="time-hint">This is the default session length; you can change it each time on the commitment screen.</p>
         </section>
 
         <section>
@@ -56,6 +64,21 @@
 
       <!-- ===================== BREAK ===================== -->
       <div class="settings-panel" data-panel="break">
+        <section>
+          <h2>Breaks</h2>
+          <p class="help">A break is a short, deliberate rest after your free time ends, so a session closes on a calm note instead of trailing off. When it is on, you commit to a break length up front on a small screen, and it always opens at the maximum so you actively choose a shorter break each time.</p>
+          <label class="toggle">
+            <input id="force-break" type="checkbox" />
+            <span>Force a break after the allowance ends</span>
+          </label>
+        </section>
+
+        <section id="break-message-section">
+          <h2>Break screen message</h2>
+          <p class="help">The words shown on the break screen while you cool down. Line breaks are kept.</p>
+          <textarea id="break-message" rows="3" placeholder="Words to read while you cool down"></textarea>
+        </section>
+
         <section>
           <h2>Break stats</h2>
           <p class="help">What you reach for on breaks.</p>
@@ -85,27 +108,6 @@
         </section>
 
         <section>
-          <h2>After completing a pause</h2>
-          <label>Allow visits to the same site freely for the next
-            <input id="allowance" type="number" min="3" max="25" step="1" /> minutes (3–25).
-          </label>
-          <p class="time-hint">This is the default session length; you can change it each time on the commitment screen.</p>
-
-          <hr />
-
-          <label class="toggle">
-            <input id="force-break" type="checkbox" />
-            <span>Force a break after the allowance ends</span>
-          </label>
-          <div id="break-options">
-            <p class="time-hint">Before each session you'll commit to a break length on a new screen — it always opens at the maximum, so you actively choose a shorter break each time.</p>
-            <label class="block">Break screen message
-              <textarea id="break-message" rows="2" placeholder="Words to read while you cool down"></textarea>
-            </label>
-          </div>
-        </section>
-
-        <section>
           <details id="breaks-fold">
             <summary class="breaks-head fold-summary">
               <span class="fold-title"><span class="fold-chevron">▸</span><h2>All breaks</h2></span>
@@ -122,6 +124,10 @@
           <h2>Magic stars</h2>
           <p class="help">Your "magic power" notes (thoughts, body, and mood) are captured before each session and shown as a star map on the reflection screen.</p>
           <p class="help">The moment before you open a distracting site is an impulse. Naming what's happening (your thoughts, where you feel it in your body, your mood) is called <em>affect labeling</em>. Putting a feeling into words is an evidence-based way to loosen its grip, so each session can open with a small, unhurried reflection instead of a reflex. Your notes never leave your device. Over time they gather into a private <strong>star map</strong>, where more recent notes shine brighter. No scores, no streaks, no judgement. Just your own sky to glance back at.</p>
+          <label class="toggle">
+            <input id="magic-stars" type="checkbox" />
+            <span>Enable magic stars: open each blocked session with the reflection screen. Its countdown replaces the hold-to-pause (no holding; it pauses when the tab loses focus and resumes where it left off). When off, the plain hold-to-pause screen is used instead.</span>
+          </label>
         </section>
 
         <section>
@@ -133,23 +139,25 @@
           </div>
           <label class="toggle">
             <input id="reduce-motion" type="checkbox" />
-            <span>Reduced motion (e-ink friendly) — turn off the wand trail, sparkles, and twinkle</span>
+            <span>Reduced motion (e-ink friendly): turn off the wand trail, sparkles, and twinkle</span>
           </label>
           <p class="help" style="margin-top:4px;">Best for e-ink or low-power screens that leave faint marks. The wand still follows your cursor. Your OS "reduce motion" setting also turns this on automatically.</p>
         </section>
 
         <section>
           <h2>Feelings (mood map)</h2>
-          <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence–arousal circumplex. Add or remove any.</p>
+          <p class="help">The feelings offered on the reflection screen's mood map, grouped by quadrant of the valence and arousal circumplex. Add or remove any.</p>
           <div id="feelings-editor"></div>
         </section>
 
         <section>
-          <div class="breaks-head">
-            <h2>All reflections</h2>
-            <span id="reflections-count" class="breaks-count">0 logged</span>
-          </div>
-          <div id="reflections-list"></div>
+          <details id="reflections-fold">
+            <summary class="breaks-head fold-summary">
+              <span class="fold-title"><span class="fold-chevron">▸</span><h2>All reflections</h2></span>
+              <span id="reflections-count" class="breaks-count">0 logged</span>
+            </summary>
+            <div id="reflections-list"></div>
+          </details>
         </section>
       </div>
     </div>

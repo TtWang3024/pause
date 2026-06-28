@@ -19,6 +19,9 @@ function createSkyMap(canvas, opts) {
   const STAR_NAME_ZOOM = 1.7;    // show bright-star proper names above this zoom
   const LABEL_COLOR = "rgba(150,170,225,0.55)";
   const LINE_COLOR  = "rgba(130,160,225,0.28)";
+  // Reflections light up as a dense cluster grown shell by shell from this centre (RA/Dec degrees).
+  const CLUSTER_RA = 80, CLUSTER_DEC = 0;
+  const CLUSTER_MIN_SEP_DEG = 1.5;   // min gap between lit stars (the "shell spacing"; smaller = denser)
 
   // ----- state -----
   const ctx = canvas.getContext("2d");
@@ -85,26 +88,58 @@ function createSkyMap(canvas, opts) {
     return { x: cx + x, y: cy - y };
   }
 
-  // ----- reflections pinned to real stars (oldest first → stable assignment) -----
+  // ----- reflections light up as a dense cluster, nearest-first, shell by shell from the centre -----
   function placeReflections() {
     placed = [];
     if (!loaded || !stars.length) return;
-    const N = stars.length;
     const start = nowTs - windowMonths * 30 * 24 * 60 * 60 * 1000;
     const end = nowTs;
     const inWin = reflections.filter((r) => r.ts >= start).sort((a, b) => a.ts - b.ts);
-    const used = new Set();
-    for (const r of inWin) {
-      let idx = Math.abs(hashStr(r.id)) % N, tries = 0;
-      while (used.has(idx) && tries < N) { idx = (idx + 1) % N; tries++; }
-      used.add(idx);
-      const st = stars[idx];
+    if (!inWin.length) return;
+    // The oldest reflection takes the star nearest the centre; each newer one the next-nearest free
+    // star, so the lit stars fill the inner shell first and then grow outward shell by shell.
+    const order = nearestStarOrder(CLUSTER_RA, CLUSTER_DEC, inWin.length);
+    for (let i = 0; i < inWin.length && i < order.length; i++) {
+      const r = inWin[i];
+      const st = stars[order[i]];
       const recency = end > start ? Math.max(0, Math.min(1, (r.ts - start) / (end - start))) : 1;
       placed.push({
-        text: r.text, ts: r.ts, ra: st[1], dec: st[2], recency,
+        id: r.id, text: r.text, ts: r.ts, ra: st[1], dec: st[2], recency,
         name: starNames[String(st[0])] || ("HIP " + st[0])
       });
     }
+  }
+
+  // Indices of the k stars nearest (raC,decC), nearest first, each kept at least
+  // CLUSTER_MIN_SEP_DEG from the ones already chosen, so the cluster is dense but the stars stay distinct.
+  function nearestStarOrder(raC, decC, k) {
+    const p0 = decC * D2R, l0 = raC * D2R, sp0 = Math.sin(p0), cp0 = Math.cos(p0);
+    const cand = [];
+    for (let i = 0; i < stars.length; i++) {
+      const st = stars[i], p = st[2] * D2R, l = st[1] * D2R;
+      cand.push({ i, cos: sp0 * Math.sin(p) + cp0 * Math.cos(p) * Math.cos(l - l0) });
+    }
+    cand.sort((a, b) => b.cos - a.cos);          // nearest (largest cos separation) first
+    const minCos = Math.cos(CLUSTER_MIN_SEP_DEG * D2R);
+    const chosen = [];
+    for (const c of cand) {
+      if (chosen.length >= k) break;
+      const st = stars[c.i], p = st[2] * D2R, l = st[1] * D2R, sp = Math.sin(p), cp = Math.cos(p);
+      let ok = true;
+      for (const j of chosen) {
+        const sj = stars[j], pj = sj[2] * D2R, lj = sj[1] * D2R;
+        if (sp * Math.sin(pj) + cp * Math.cos(pj) * Math.cos(l - lj) > minCos) { ok = false; break; }
+      }
+      if (ok) chosen.push(c.i);
+    }
+    if (chosen.length < k) {                      // sparse region → top up with the next-nearest free stars
+      const set = new Set(chosen);
+      for (const c of cand) {
+        if (chosen.length >= k) break;
+        if (!set.has(c.i)) { chosen.push(c.i); set.add(c.i); }
+      }
+    }
+    return chosen;
   }
   function setReflections(list, months, now) {
     reflections = Array.isArray(list) ? list : [];
@@ -244,6 +279,25 @@ function createSkyMap(canvas, opts) {
   }
   function setCenter(ra, dec) { ra0 = ra; dec0 = dec; }
 
+  // Smoothly carry the view centre to (ra,dec) over `ms`, easing in and out. The
+  // save celebration uses this to bring a freshly placed reflection star to the
+  // middle of the screen. Calls `done` when it settles.
+  function animateTo(ra, dec, ms, done) {
+    const startRa = ra0, startDec = dec0;
+    const dRa = ((ra - startRa + 540) % 360) - 180;   // shortest way around the circle
+    const dur = ms || 1200, t0 = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - t0) / dur);
+      const e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // easeInOutQuad
+      ra0 = (startRa + dRa * e + 360) % 360;
+      dec0 = startDec + (dec - startDec) * e;
+      render(true);
+      if (t < 1) requestAnimationFrame(step);
+      else { render(false); if (done) done(); }
+    }
+    requestAnimationFrame(step);
+  }
+
   // nearest reflection star to a screen point (within its halo); else null
   function hitTest(px, py) {
     let best = null, bestD = Infinity;
@@ -255,7 +309,8 @@ function createSkyMap(canvas, opts) {
   }
 
   return {
-    load, setSize, render, setReflections, pan, zoomBy, setCenter, hitTest,
+    load, setSize, render, setReflections, pan, zoomBy, setCenter, hitTest, animateTo,
+    getRef: (id) => placed.find((p) => p.id === id) || null,
     isLoaded: () => loaded,
     getZoom: () => zoom
   };

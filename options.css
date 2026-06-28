@@ -348,6 +348,20 @@ label.block textarea {
   resize: vertical;
 }
 
+#break-message {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: 6px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--fg);
+  resize: vertical;
+}
+
 #break-options {
   margin-top: 10px;
   padding-left: 24px;
@@ -654,6 +668,7 @@ hr {
 .fold-chevron { font-size: 12px; color: var(--muted); transition: transform 0.15s ease; }
 details[open] .fold-chevron { transform: rotate(90deg); }
 #breaks-fold #breaks-list { margin-top: 14px; }
+#reflections-fold #reflections-list { margin-top: 14px; }
 
 .breaks-count {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

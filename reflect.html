@@ -18,7 +18,7 @@
   <main id="stage">
     <p id="heading">Your sky of reflections.</p>
     <div id="bottom">
-      <p id="hint">Shake the wand to open a star — or just continue.</p>
+      <p id="hint">Shake the wand to open a star, or just continue.</p>
       <button id="continue-btn" class="continue" type="button">Continue →</button>
     </div>
   </main>
@@ -27,7 +27,7 @@
   <div id="compose-overlay">
     <div id="compose">
       <button id="compose-close" type="button" aria-label="Close">×</button>
-      <div class="field">
+      <div class="field field-thoughts">
         <label>Thoughts</label>
         <div id="thought-chips"></div>
         <input id="thought-input" type="text" autocomplete="off" placeholder="What's on your mind? (press Enter to add)" />
@@ -40,7 +40,7 @@
             <div id="body-dots"></div>
           </div>
           <div class="bodymap-side">
-            <p id="body-hint" class="bodymap-hint">Hover the rabbit — tap a glowing point (up to 3).</p>
+            <p id="body-hint" class="bodymap-hint">Hover the rabbit, then tap a glowing point (up to 3).</p>
             <div id="body-tags"></div>
           </div>
         </div>
@@ -64,6 +64,17 @@
       </div>
       <button id="save-btn" class="continue" type="button">Save ✨</button>
     </div>
+  </div>
+
+  <!-- Save celebration: the reflection settles as a star in your sky -->
+  <div id="celebrate" class="hidden">
+    <img id="celebrate-star" alt="" draggable="false" />
+    <div id="celebrate-msg">
+      <p class="cel-line">Thank you for pausing.</p>
+      <p class="cel-line">One step closer to your real self.</p>
+      <p class="cel-line">Your sky gained a star <strong id="celebrate-name"></strong>.</p>
+    </div>
+    <button id="celebrate-continue" class="continue" type="button">Continue →</button>
   </div>
 
   <img id="wand" alt="" draggable="false" />

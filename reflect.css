@@ -62,10 +62,12 @@ body { background: #04040a; color: #fff; }
   pointer-events: auto;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
+#bottom.hide { display: none; }   /* hidden once a star is open or the celebration is showing */
 
-/* compose modal — hidden until a star is opened */
+/* compose modal — hidden until a star is opened. z-index sits above the window
+   toggle and any summoned star (both z-index 4) so nothing can swallow its clicks. */
 #compose-overlay {
-  position: fixed; inset: 0; z-index: 3; display: none;
+  position: fixed; inset: 0; z-index: 50; display: none;
   align-items: center; justify-content: center; padding: 24px;
   background: rgba(0, 0, 0, 0.32);
 }
@@ -75,36 +77,39 @@ body.compose-light #compose-overlay { background: rgba(255, 255, 255, 0.4); }
 #compose {
   position: relative;
   pointer-events: auto;
-  width: min(560px, 94vw);
-  max-height: 88vh; overflow-y: auto;
+  width: min(620px, 95vw);
+  max-height: 90vh; overflow-y: auto;
   background: rgba(24, 24, 34, 0.93);
   color: #fff;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;
-  padding: 22px 18px 18px;
+  padding: 26px 22px 22px;
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
-  display: flex; flex-direction: column; gap: 14px;
+  display: flex; flex-direction: column; gap: 18px;
 }
 body.compose-light #compose {
   background: rgba(255, 255, 255, 0.97); color: #111; border-color: rgba(0, 0, 0, 0.1);
 }
 
 #compose-close {
-  position: absolute; top: 8px; right: 10px;
-  width: 30px; height: 30px; border-radius: 50%;
+  position: absolute; top: 10px; right: 12px; z-index: 5;   /* always on top, in clear space */
+  width: 32px; height: 32px; border-radius: 50%;
   border: none; background: rgba(128, 128, 128, 0.25); color: inherit;
   font-size: 18px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
 }
 
 .field { text-align: left; }
+/* keep the top field clear of the × close button so its lower-left stays clickable */
+.field-thoughts { padding-right: 34px; }
 .field > label {
-  display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; opacity: 0.55; margin-bottom: 6px;
+  display: block; font-size: 17px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; opacity: 0.55; margin-bottom: 9px;
 }
 
 #thought-input {
-  width: 100%; font-family: inherit; font-size: 14px; padding: 9px 11px;
-  border-radius: 8px; border: 1px solid rgba(128,128,128,0.4);
+  width: 100%; font-family: inherit; font-size: 18px; padding: 13px 15px;
+  border-radius: 10px; border: 1px solid rgba(128,128,128,0.4);
   background: rgba(128,128,128,0.12); color: inherit; cursor: none;
 }
 #thought-input::placeholder { color: inherit; opacity: 0.4; }
@@ -114,7 +119,7 @@ body.compose-light #compose {
 
 .thought-chip {
   display: inline-flex; align-items: center; gap: 6px;
-  font-size: 13px; padding: 5px 6px 5px 10px; border-radius: 999px;
+  font-size: 17px; padding: 7px 9px 7px 13px; border-radius: 999px;
   background: rgba(128,128,128,0.2);
 }
 .thought-chip.dragging, .body-tag.dragging { opacity: 0.45; }
@@ -144,87 +149,141 @@ body.compose-light #compose {
 }
 .bdot-label {
   position: absolute; left: 50%; bottom: 145%; transform: translateX(-50%);
-  white-space: nowrap; font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  white-space: nowrap; font-size: 14px; padding: 3px 9px; border-radius: 999px;
   background: rgba(20,20,30,0.92); color: #fff; opacity: 0; pointer-events: none;
   transition: opacity 0.12s ease;
 }
-.bdot:hover .bdot-label, .bdot.near .bdot-label, .bdot.on .bdot-label { opacity: 1; }
+.bdot:hover .bdot-label, .bdot.near .bdot-label { opacity: 1; }   /* show the label only on hover, not once logged */
 body.compose-light .bdot-label { background: rgba(45,45,60,0.95); }
+.bdot.sense .bdot-label { background: #f8d7e3; color: #111; }     /* senses: light pink, black text */
 
 /* crowded head senses → one cluster that opens see / smell / taste together */
 .bface { position: absolute; }
 .bface-anchor { left: 0; top: 0; pointer-events: none; }
 .bface.open .bface-anchor { opacity: 1; transform: scale(1.18); }
 .bface-pop {
-  position: absolute; left: 15px; top: 0;
+  position: absolute; top: 0;
   display: none; flex-direction: column; gap: 4px;
 }
+.bface-pop-right { left: 15px; }                          /* see / smell / taste */
+.bface-pop-left { right: 15px; align-items: flex-end; }   /* head area, to the left of the dot */
 .bface.open .bface-pop { display: flex; }
-.bface-chip {
-  font-family: inherit; font-size: 11px; white-space: nowrap; padding: 4px 10px; border-radius: 999px;
-  border: 1px solid rgba(255,205,110,0.7); background: rgba(20,20,30,0.92); color: #fff; cursor: pointer;
+.bface-chip {                                          /* head senses: light pink, black text */
+  font-family: inherit; font-size: 14px; white-space: nowrap; padding: 5px 12px; border-radius: 999px;
+  border: 1px solid #e8a9c0; background: #f8d7e3; color: #111; cursor: pointer;
 }
-body.compose-light .bface-chip { background: rgba(45,45,60,0.95); }
-.bface-chip.on { background: #ff9b6b; border-color: #ff9b6b; color: #fff; }
+body.compose-light .bface-chip { background: #f8d7e3; color: #111; }
+.bface-chip.on { background: #e97ba6; border-color: #e97ba6; color: #fff; }
+/* head area is a general body part, not a sense → dark like the arm / leg labels */
+.bface-chip[data-part="head area"] { background: rgba(20,20,30,0.92); color: #fff; border-color: rgba(255,255,255,0.25); }
+body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,60,0.95); color: #fff; }
+.bface-chip[data-part="head area"].on { background: #ff9b6b; border-color: #ff9b6b; color: #fff; }
 
 .bodymap-side { flex: 1 1 auto; min-width: 0; }
-.bodymap-hint { margin: 0 0 8px; font-size: 12px; opacity: 0.6; }
+.bodymap-hint { margin: 0 0 10px; font-size: 16px; opacity: 0.6; }
 .bodymap-hint.limit { animation: bodyhint-flash 0.5s ease; }
 @keyframes bodyhint-flash { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; color: #ff9b6b; } }
 #body-tags { display: flex; flex-direction: column; gap: 8px; }
-.body-tag { background: rgba(128,128,128,0.12); border-radius: 10px; padding: 8px 10px; display: flex; flex-direction: column; gap: 5px; }
+.body-tag { background: rgba(128,128,128,0.12); border-radius: 12px; padding: 11px 13px; display: flex; flex-direction: column; gap: 7px; }
 .body-tag-head { display: flex; align-items: center; gap: 6px; }
-.body-tag-name { font-weight: 600; font-size: 13px; flex: 1; }
+.body-tag-name { font-weight: 600; font-size: 16px; flex: 1; }
 .body-tag .x { border: none; background: rgba(0,0,0,0.18); color: inherit; border-radius: 999px; padding: 1px 7px; cursor: pointer; font-size: 13px; line-height: 1; }
-.body-tag input { width: 100%; font-family: inherit; font-size: 13px; padding: 6px 9px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.4); background: rgba(128,128,128,0.1); color: inherit; }
+.body-tag input { width: 100%; font-family: inherit; font-size: 16px; padding: 9px 12px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.4); background: rgba(128,128,128,0.1); color: inherit; }
 .body-tag input::placeholder { color: inherit; opacity: 0.4; }
 
-/* Russell circumplex mood map — four boxes with axis arrows + icons in the gutters */
-#circumplex { position: relative; padding: 8px; --cx-line: rgba(128,128,128,0.5); }
-.cx-grid { display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 50px; }
+/* Russell circumplex mood map: four quadrants joined into one block, big axis icons at the arrow tips */
+#circumplex { position: relative; padding: 0; --cx-line: #3a3a3a; }
+.cx-grid {
+  display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+  gap: 0; border-radius: 14px; overflow: hidden;
+}
 
-/* axis arrows (double-headed) along the central cross gutter, between the icons */
+/* axis arrows (double-headed), strong dark grey, overlaid on the joined block through the centre */
 .cx-axis-v, .cx-axis-h { position: absolute; background: var(--cx-line); pointer-events: none; }
-.cx-axis-v { left: 50%; top: 48px; bottom: 48px; width: 2px; margin-left: -1px; }
-.cx-axis-h { top: 50%; left: 48px; right: 48px; height: 2px; margin-top: -1px; }
+.cx-axis-v { left: 50%; top: 62px; bottom: 62px; width: 3px; margin-left: -1.5px; }
+.cx-axis-h { top: 50%; left: 62px; right: 62px; height: 3px; margin-top: -1.5px; }
 .cx-axis-v::before, .cx-axis-v::after, .cx-axis-h::before, .cx-axis-h::after { content: ""; position: absolute; width: 0; height: 0; }
-.cx-axis-v::before { top: -7px; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid var(--cx-line); }
-.cx-axis-v::after  { bottom: -7px; left: -4px; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 7px solid var(--cx-line); }
-.cx-axis-h::before { left: -7px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 7px solid var(--cx-line); }
-.cx-axis-h::after  { right: -7px; top: -4px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--cx-line); }
+.cx-axis-v::before { top: -10px; left: -5.5px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-bottom: 10px solid var(--cx-line); }
+.cx-axis-v::after  { bottom: -10px; left: -5.5px; border-left: 7px solid transparent; border-right: 7px solid transparent; border-top: 10px solid var(--cx-line); }
+.cx-axis-h::before { left: -10px; top: -5.5px; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-right: 10px solid var(--cx-line); }
+.cx-axis-h::after  { right: -10px; top: -5.5px; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 10px solid var(--cx-line); }
 
-/* the four mood icons sit in the gutter ends, fully inside the box area (never outside) */
-.cx-ico { position: absolute; width: 26px; height: 26px; }
-.cx-ico-top    { top: 13px;  left: 50%; transform: translateX(-50%); }
-.cx-ico-bottom { bottom: 13px; left: 50%; transform: translateX(-50%); }
-.cx-ico-left   { left: 13px;  top: 50%; transform: translateY(-50%); }
-.cx-ico-right  { right: 13px; top: 50%; transform: translateY(-50%); }
+/* the four mood icons sit large at the head and tail of each arrow, near the block edges */
+.cx-ico { position: absolute; width: 44px; height: 44px; pointer-events: none; }
+.cx-ico-top    { top: 8px;    left: 50%; transform: translateX(-50%); }
+.cx-ico-bottom { bottom: 8px; left: 50%; transform: translateX(-50%); }
+.cx-ico-left   { left: 8px;   top: 50%; transform: translateY(-50%); }
+.cx-ico-right  { right: 8px;  top: 50%; transform: translateY(-50%); }
 
+/* quadrant cells, flush together; tags sit centred in a box in the middle of each quadrant,
+   inset from the central axis and the edge icons */
 .cx-cell {
-  border-radius: 12px; padding: 12px; min-height: 132px;
-  display: flex; flex-wrap: wrap; gap: 6px; align-content: flex-start; cursor: pointer;
+  min-height: 200px; padding: 28px 36px;
+  display: flex; flex-wrap: wrap; gap: 8px 10px; cursor: pointer;
+  align-content: center; justify-content: center; align-items: center;
 }
 .cx-cell[data-q="tl"] { background: #FAECE7; }
 .cx-cell[data-q="tr"] { background: #FAEEDA; }
 .cx-cell[data-q="bl"] { background: #E6F1FB; }
 .cx-cell[data-q="br"] { background: #EAF3DE; }
+
+/* pills carry their quadrant's colour on the border and text (set per quadrant from JS) */
 .cx-chip {
-  font-family: inherit; font-size: 12px; padding: 4px 9px; border-radius: 999px;
-  background: #fff; border: 0.5px solid; cursor: pointer;
+  font-family: inherit; font-size: 16px; padding: 7px 14px; border-radius: 999px;
+  background: #fff; border: 1.5px solid; cursor: pointer; font-weight: 600;
 }
 .cx-chip.on { color: #fff !important; }
 .cx-add {
-  font-family: inherit; font-size: 12px; padding: 4px 8px; border-radius: 999px;
-  border: 0.5px dashed currentColor; background: rgba(255,255,255,0.7); width: 10ch; color: inherit;
+  font-family: inherit; font-size: 16px; padding: 7px 12px; border-radius: 999px;
+  border: 1.5px dashed currentColor; background: rgba(255,255,255,0.7); width: 10ch; color: inherit;
 }
 
 .continue {
   align-self: center; margin-top: 2px;
-  font-family: inherit; font-weight: 600; font-size: 17px;
-  padding: 11px 30px; border-radius: 999px; cursor: pointer;
+  font-family: inherit; font-weight: 600; font-size: 19px;
+  padding: 13px 36px; border-radius: 999px; cursor: pointer;
   background: #6aa3ff; border: 1.5px solid #6aa3ff; color: #fff;
 }
 #hint { margin: 0; font-size: 12px; opacity: 0.5; text-align: center; }
+
+/* grey + inert while the merged pause countdown is still running */
+.continue:disabled { background: #8a8f99; border-color: #8a8f99; color: rgba(255, 255, 255, 0.85); cursor: default; }
+/* monospaced, fixed-width countdown digits so Continue / Save never change width as they tick */
+.cd-num { font-variant-numeric: tabular-nums; display: inline-block; min-width: 2ch; text-align: center; }
+
+/* save celebration: the compose shrinks into a star that takes its place in the sky */
+#compose.shrink { transform: scale(0.04); opacity: 0; transition: transform 0.45s ease-in, opacity 0.4s ease-in; pointer-events: none; }
+
+#celebrate { position: fixed; inset: 0; z-index: 40; pointer-events: none; }
+#celebrate.hidden { display: none; }
+/* the wand is hidden during the celebration, so bring back a normal cursor to click Continue */
+body.celebrating { cursor: default; }
+#celebrate-star {
+  position: absolute; top: 50%; left: 50%; width: 96px; height: 96px;
+  transform: translate(-50%, -50%) scale(0); opacity: 0;
+  filter: drop-shadow(0 0 16px rgba(255, 214, 130, 0.7));
+}
+#celebrate-star.pop { animation: cel-pop 0.6s ease-out forwards; }
+@keyframes cel-pop {
+  0%   { transform: translate(-50%, -50%) scale(0);    opacity: 0; }
+  60%  { transform: translate(-50%, -50%) scale(1.18); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1);    opacity: 1; }
+}
+#celebrate-star.settle { opacity: 0.85; transition: opacity 1.2s ease; }
+#celebrate-star.static { transform: translate(-50%, -50%) scale(1); opacity: 1; }   /* reduced motion: no pop */
+#celebrate-msg {
+  position: absolute; left: 0; right: 0; top: 60%; padding: 0 24px;
+  text-align: center; opacity: 0; transition: opacity 0.8s ease;
+}
+#celebrate-msg.show { opacity: 1; }
+.cel-line { margin: 7px 0; font-weight: 600; font-size: 19px; color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65); }
+.cel-line:last-child { font-size: 16px; opacity: 0.92; }
+#celebrate-name { color: #ffe08a; }
+#celebrate-continue {
+  position: absolute; left: 50%; top: 78%; transform: translateX(-50%);
+  pointer-events: auto; opacity: 0; transition: opacity 0.8s ease;
+}
+#celebrate-continue.show { opacity: 1; }
 
 /* Over the compose form, use the normal OS cursor (not the wand) */
 #compose { cursor: default; }

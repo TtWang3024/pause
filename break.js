@@ -5,8 +5,11 @@ const groupId = params.get("group") || "";
 const minsParam = parseInt(params.get("mins"), 10);
 
 const messageEl = document.getElementById("message");
-const echoEl = document.getElementById("chosen-echo");
-const cornerEl = document.getElementById("corner-timer");
+const timeLeftEl = document.getElementById("time-left");
+const breakLenEl = document.getElementById("break-len");
+const progressFillEl = document.getElementById("progress-fill");
+const ratingEl = document.getElementById("rating");
+const ratingPromptEl = document.getElementById("rating-prompt");
 const listEl = document.getElementById("activity-list");
 const pickHintEl = document.getElementById("pick-hint");
 const doneBtn = document.getElementById("done-btn");
@@ -20,7 +23,9 @@ let activities = [];
 const selected = new Map(); // id -> { id, name, tag }
 let unlocked = false;
 let durationMin = 0;
+let totalMs = 0;
 let hintTimer = null;
+let ratingValue = null;   // -1 / 0 / +1 once tapped; stays null if skipped
 
 function applyBackground(bg) {
   if (!bg) return;
@@ -63,7 +68,7 @@ function renderChips() {
   if (!activities.length) {
     const empty = document.createElement("p");
     empty.className = "list-empty";
-    empty.textContent = "No saved activities yet — add one below.";
+    empty.textContent = "No saved activities yet. Add one below.";
     listEl.appendChild(empty);
     return;
   }
@@ -102,7 +107,7 @@ function toggleSelect(a) {
     selected.delete(a.id);
   } else {
     if (selected.size >= MAX_PICK) {
-      flashHint(`That's ${MAX_PICK} already — tap one to deselect first`);
+      flashHint(`That's ${MAX_PICK} already, tap one to deselect first`);
       return;
     }
     selected.set(a.id, { id: a.id, name: a.name, tag: a.tag || "" });
@@ -126,15 +131,44 @@ async function onCustomAdd() {
   customName.focus();
 }
 
+// One quiet tap: "Did {group} give you what you came for?" Last tap wins; skipping stays null.
+function bindRating(groupLabel) {
+  const ask = `Did ${groupLabel} give you what you came for?`;
+  ratingPromptEl.textContent = ask;
+  const opts = ratingEl.querySelectorAll(".rate-opt");
+  opts.forEach((b) => {
+    b.addEventListener("click", () => {
+      const v = parseInt(b.dataset.v, 10);
+      if (ratingValue === v) {                 // tap the chosen one again → back to skipped
+        ratingValue = null;
+        b.classList.remove("on");
+        ratingEl.classList.remove("rated");
+        ratingPromptEl.textContent = ask;
+        return;
+      }
+      ratingValue = v;
+      opts.forEach((o) => o.classList.toggle("on", o === b));
+      ratingEl.classList.add("rated");
+      ratingPromptEl.textContent =
+        ratingValue < 0 ? "Noted. Good to know." :
+        ratingValue > 0 ? "Noted. Rest easy." : "Noted.";
+    });
+  });
+}
+
 function tick() {
   const remaining = breakEnd - Date.now();
-  cornerEl.textContent = format(remaining);
+  timeLeftEl.textContent = format(remaining);
+  if (totalMs > 0) {
+    const frac = Math.max(0, Math.min(1, (totalMs - remaining) / totalMs));
+    progressFillEl.style.width = (frac * 100).toFixed(1) + "%";
+  }
   if (remaining <= 0) {
-    cornerEl.textContent = "00:00";
+    timeLeftEl.textContent = "00:00";
+    progressFillEl.style.width = "100%";
     unlock();
     return;
   }
-  doneBtn.textContent = "Wait " + format(remaining);
   setTimeout(tick, 250);
 }
 
@@ -154,12 +188,13 @@ async function onDone() {
     id: genId("b"),
     ts: Date.now(),
     durationMin,
-    activities: Array.from(selected.values())
+    activities: Array.from(selected.values()),
+    ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
   });
   await saveBreakLog(log);
-  // Restart the cycle: re-enter via the reflection screen when breaks are
-  // enforced (reflect → commit → pause), otherwise straight to the pause page.
-  const entry = settings?.forceBreak ? "reflect.html" : "pause.html";
+  // Restart the cycle: re-enter via the reflection screen when Magic Stars is on
+  // (its countdown then leads to commit), otherwise the plain hold-to-pause page.
+  const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
   const nextUrl = chrome.runtime.getURL(entry) +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId);
@@ -179,15 +214,18 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   }
   // The committed length comes from the URL; fall back to the max if absent.
   durationMin = Number.isFinite(minsParam) ? minsParam : 30;
-  if (durationMin > 0) {
-    echoEl.textContent = `You chose a ${durationMin}-minute break.`;
-  }
+  totalMs = durationMin * 60 * 1000;
+  breakLenEl.textContent = durationMin > 0 ? `${durationMin}-minute break` : "break";
+  const gname = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
+  const gLabel = (!gname.trim() || gname.trim().toLowerCase() === "default") ? "this group" : gname.trim();
+  bindRating(gLabel);
   activities = await ensureSeededActivities();
   updateHint();
   renderChips();
 
   if (!breakEnd || isNaN(breakEnd)) {
-    cornerEl.textContent = "—";
+    timeLeftEl.textContent = "00:00";
+    progressFillEl.style.width = "100%";
     unlock();
     return;
   }

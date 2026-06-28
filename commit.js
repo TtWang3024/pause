@@ -15,7 +15,7 @@ const hintEl = document.getElementById("hint");
 const targetEl = document.getElementById("target");
 
 // Break length: discrete levels. Drag and scroll snap to these; typing / arrow
-// keys stay free (any 1–30) for precision.
+// keys stay free (any 1 to 30) for precision.
 const LEVELS = [1, 3, 5, 10, 15, 20, 25, 30];
 const MIN = LEVELS[0];
 const MAX = LEVELS[LEVELS.length - 1];
@@ -210,6 +210,26 @@ async function proceed() {
   location.replace(targetUrl);
 }
 
+// Mirror the user's own past ratings for this group back as one faint line. Needs >= 3
+// rated visits in the last 14 days; stays silent when the signal is mixed. Never gates.
+async function showRatingEcho(settings) {
+  const echoEl = document.getElementById("rating-echo");
+  if (!echoEl || !groupId) return;
+  let log = [];
+  try { log = await loadBreakLog(); } catch (e) { return; }
+  const cutoff = Date.now() - 14 * 24 * 60 * 60 * 1000;
+  const rated = log.filter((e) => e && e.group === groupId && typeof e.rating === "number" && e.ts >= cutoff);
+  if (rated.length < 3) return;
+  const mean = rated.reduce((s, e) => s + e.rating, 0) / rated.length;
+  if (mean > -0.34 && mean < 0.34) return;   // mixed signal → stay silent
+  const gnameRaw = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
+  const gname = gnameRaw.trim();
+  const gLabel = (!gname || gname.toLowerCase() === "default") ? "this group" : gname;
+  echoEl.textContent = mean <= -0.34
+    ? `Lately, ${gLabel} mostly hasn't given you what you came for.`
+    : `Lately, ${gLabel} has been landing.`;
+}
+
 (async function init() {
   buildScale();
   if (!targetUrl) {
@@ -226,4 +246,5 @@ async function proceed() {
   if (settings) applyBackground(settings.background);
   setValue(MAX); // break always opens at the maximum — no setting, no memory
   setSession(settings?.allowanceMinutes ?? SESSION_MAX); // session defaults to the settings allowance
+  showRatingEcho(settings);
 })();

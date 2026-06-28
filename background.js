@@ -20,6 +20,7 @@ const DEFAULT_SETTINGS = {
   allowanceMinutes: 5,
   resetOnRelease: false,
   forceBreak: false,
+  magicStars: true,
   breakMessage: "Step away from the screen. Stretch. Breathe."
 };
 
@@ -45,10 +46,11 @@ function clampAllowanceMinutes(n) {
   return Math.max(ALLOW_MIN, Math.min(ALLOW_MAX, n));
 }
 
-// The screen that starts the gate: when a break is enforced, the reflection
-// screen (→ commitment → pause); otherwise straight to the pause page.
-function entryUrl(targetUrl, groupId, forceBreak) {
-  const base = forceBreak ? REFLECT_PAGE : PAUSE_PAGE;
+// The screen that starts the gate. When Magic Stars is on, the reflection screen
+// (whose built-in countdown replaces the separate hold page); otherwise the plain
+// hold-to-pause page.
+function entryUrl(targetUrl, groupId, useReflect) {
+  const base = useReflect ? REFLECT_PAGE : PAUSE_PAGE;
   return base +
     "?url=" + encodeURIComponent(targetUrl) +
     "&group=" + encodeURIComponent(groupId);
@@ -217,7 +219,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   }
   // Break is over (or there was none) → kick the whole group back to the entry
   // screen (commitment screen when a break is enforced, else the pause page).
-  await redirectTabsInGroup(group, (url) => entryUrl(url, groupId, settings.forceBreak));
+  await redirectTabsInGroup(group, (url) => entryUrl(url, groupId, settings.magicStars !== false));
   await setGroupState(groupId, null);
   await chrome.alarms.clear("expire:" + groupId);
 });
@@ -246,7 +248,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
     chrome.tabs.update(details.tabId, { url: redirect });
     return;
   }
-  chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.forceBreak) });
+  chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.magicStars !== false) });
 });
 
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {

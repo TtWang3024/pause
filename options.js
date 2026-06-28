@@ -8,6 +8,7 @@ const DEFAULT_SETTINGS = {
   allowanceMinutes: 5,
   resetOnRelease: false,
   forceBreak: false,
+  magicStars: true,
   breakMessage: "Step away from the screen. Stretch. Breathe."
 };
 
@@ -20,8 +21,9 @@ const allowanceEl = document.getElementById("allowance");
 const bgCustomEl = document.getElementById("bg-custom");
 const resetOnReleaseEl = document.getElementById("reset-on-release");
 const forceBreakEl = document.getElementById("force-break");
+const magicStarsEl = document.getElementById("magic-stars");
 const breakMessageEl = document.getElementById("break-message");
-const breakOptionsEl = document.getElementById("break-options");
+const breakOptionsEl = document.getElementById("break-message-section");
 const tpl = document.getElementById("group-template");
 
 function uuid() {
@@ -157,6 +159,7 @@ saveBtn.addEventListener("click", async () => {
     allowanceMinutes: clampInt(allowanceEl.value, 3, 25, 5),
     resetOnRelease: resetOnReleaseEl.checked,
     forceBreak: forceBreakEl.checked,
+    magicStars: magicStarsEl.checked,
     breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage
   };
   await chrome.storage.sync.set({ settings });
@@ -174,6 +177,7 @@ saveBtn.addEventListener("click", async () => {
   allowanceEl.value = Math.min(25, Math.max(3, s.allowanceMinutes ?? 5));
   resetOnReleaseEl.checked = !!s.resetOnRelease;
   forceBreakEl.checked = !!s.forceBreak;
+  magicStarsEl.checked = s.magicStars !== false;
   breakMessageEl.value = s.breakMessage ?? DEFAULT_SETTINGS.breakMessage;
   syncBreakVisibility();
 })();

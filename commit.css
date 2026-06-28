@@ -208,3 +208,11 @@ body.theme-white {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* faint reflection of your own past ratings for this group; mirrors, never gates */
+#rating-echo {
+  margin: 8px 0 0;
+  font-size: 13px;
+  opacity: 0.55;
+  max-width: 80vw;
+}
