@@ -17,11 +17,12 @@ function createSkyMap(canvas, opts) {
   const CLIP = -0.35;       // cull points whose cos(angular distance from center) is below this
   const PAN_DEG_PER_PX = 0.16;   // drag sensitivity (÷ zoom)
   const STAR_NAME_ZOOM = 1.7;    // show bright-star proper names above this zoom
-  const LABEL_COLOR = "rgba(150,170,225,0.55)";
-  const LINE_COLOR  = "rgba(130,160,225,0.28)";
-  // Reflections light up as a dense cluster grown shell by shell from this centre (RA/Dec degrees).
-  const CLUSTER_RA = 80, CLUSTER_DEC = 0;
-  const CLUSTER_MIN_SEP_DEG = 1.5;   // min gap between lit stars (the "shell spacing"; smaller = denser)
+  let LABEL_COLOR = "rgba(150,170,225,0.55)";
+  let LINE_COLOR  = "rgba(130,160,225,0.28)";
+  let STARNAME_COLOR = "rgba(220,228,255,0.6)";
+  let isLight = false;   // dark sky by default; flipped for light backgrounds
+  // Reflections light up on the brightest stars, brightest first, kept at least this far apart.
+  const CLUSTER_MIN_SEP_DEG = 1.5;   // min gap (degrees) between any two lit reflection stars
 
   // ----- state -----
   const ctx = canvas.getContext("2d");
@@ -96,9 +97,9 @@ function createSkyMap(canvas, opts) {
     const end = nowTs;
     const inWin = reflections.filter((r) => r.ts >= start).sort((a, b) => a.ts - b.ts);
     if (!inWin.length) return;
-    // The oldest reflection takes the star nearest the centre; each newer one the next-nearest free
-    // star, so the lit stars fill the inner shell first and then grow outward shell by shell.
-    const order = nearestStarOrder(CLUSTER_RA, CLUSTER_DEC, inWin.length);
+    // The oldest reflection takes the brightest star; each newer one the next-brightest free star,
+    // so reflections land on prominent, well-separated stars rather than crowding by proximity.
+    const order = brightestStarOrder(inWin.length);
     for (let i = 0; i < inWin.length && i < order.length; i++) {
       const r = inWin[i];
       const st = stars[order[i]];
@@ -110,16 +111,14 @@ function createSkyMap(canvas, opts) {
     }
   }
 
-  // Indices of the k stars nearest (raC,decC), nearest first, each kept at least
-  // CLUSTER_MIN_SEP_DEG from the ones already chosen, so the cluster is dense but the stars stay distinct.
-  function nearestStarOrder(raC, decC, k) {
-    const p0 = decC * D2R, l0 = raC * D2R, sp0 = Math.sin(p0), cp0 = Math.cos(p0);
+  // Indices of the k brightest stars, brightest first, each kept at least CLUSTER_MIN_SEP_DEG
+  // from the ones already chosen, so reflections sit on prominent, well-separated stars.
+  function brightestStarOrder(k) {
     const cand = [];
     for (let i = 0; i < stars.length; i++) {
-      const st = stars[i], p = st[2] * D2R, l = st[1] * D2R;
-      cand.push({ i, cos: sp0 * Math.sin(p) + cp0 * Math.cos(p) * Math.cos(l - l0) });
+      cand.push({ i, mag: stars[i][3] == null ? 6 : stars[i][3] });
     }
-    cand.sort((a, b) => b.cos - a.cos);          // nearest (largest cos separation) first
+    cand.sort((a, b) => a.mag - b.mag);          // brightest (lowest magnitude) first
     const minCos = Math.cos(CLUSTER_MIN_SEP_DEG * D2R);
     const chosen = [];
     for (const c of cand) {
@@ -150,7 +149,7 @@ function createSkyMap(canvas, opts) {
 
   // ----- drawing -----
   function drawMilkyWay() {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = isLight ? "#46506e" : "#ffffff";
     for (const band of mw) {
       ctx.globalAlpha = 0.006 + band.l * 0.006;   // faint → brighter per level
       for (const ring of band.p) {
@@ -201,9 +200,13 @@ function createSkyMap(canvas, opts) {
       let r = (2.5 - mag * 0.42) * Math.min(1.7, 0.7 + zoom * 0.4);
       if (r < 0.35) r = 0.35;
       const a = Math.max(0.18, Math.min(1, 1.15 - mag * 0.13));
-      const c = bvColor(st[4]);
       ctx.beginPath();
-      ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+      if (isLight) {
+        ctx.fillStyle = `rgba(45,60,95,${Math.min(1, a + 0.12)})`;   // dark stars on a light sky
+      } else {
+        const c = bvColor(st[4]);
+        ctx.fillStyle = `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+      }
       ctx.arc(q.x, q.y, r, 0, 6.2832);
       ctx.fill();
     }
@@ -220,7 +223,7 @@ function createSkyMap(canvas, opts) {
       ctx.fillText(lb[0], q.x, q.y);
     }
     if (zoom >= STAR_NAME_ZOOM) {              // bright named stars, only when zoomed in
-      ctx.fillStyle = "rgba(220,228,255,0.6)";
+      ctx.fillStyle = STARNAME_COLOR;
       ctx.font = "11px 'Figtree', system-ui, sans-serif";
       ctx.textAlign = "left";
       for (const st of stars) {
@@ -241,19 +244,22 @@ function createSkyMap(canvas, opts) {
       if (!q || q.x < -20 || q.x > W + 20 || q.y < -20 || q.y > H + 20) continue;
       const r = 3 + p.recency * 6;
       const a = 0.45 + p.recency * 0.55;
-      ctx.beginPath();                          // halo
-      ctx.fillStyle = `rgba(255,205,110,${0.12 + p.recency * 0.13})`;
-      ctx.arc(q.x, q.y, r * 2.4, 0, 6.2832);
+      const dot = r / 3;                         // solid dot shrunk to a third; the glow halo stays
+      ctx.beginPath();                          // halo (outer glow, halved)
+      ctx.fillStyle = isLight
+        ? `rgba(210,130,20,${0.16 + p.recency * 0.18})`
+        : `rgba(255,205,110,${0.12 + p.recency * 0.13})`;
+      ctx.arc(q.x, q.y, r * 1.2, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();                          // warm core
-      ctx.fillStyle = `rgba(255,224,150,${a})`;
-      ctx.arc(q.x, q.y, r, 0, 6.2832);
+      ctx.fillStyle = isLight ? `rgba(200,120,15,${a})` : `rgba(255,224,150,${a})`;
+      ctx.arc(q.x, q.y, dot, 0, 6.2832);
       ctx.fill();
       ctx.beginPath();                          // bright center
-      ctx.fillStyle = `rgba(255,255,255,${a})`;
-      ctx.arc(q.x, q.y, r * 0.42, 0, 6.2832);
+      ctx.fillStyle = isLight ? `rgba(120,65,0,${a})` : `rgba(255,255,255,${a})`;
+      ctx.arc(q.x, q.y, dot * 0.42, 0, 6.2832);
       ctx.fill();
-      drawnRefs.push({ x: q.x, y: q.y, r: Math.max(10, r * 2.4), data: p });
+      drawnRefs.push({ x: q.x, y: q.y, r: Math.max(10, r * 1.2), data: p });
     }
   }
 
@@ -278,6 +284,20 @@ function createSkyMap(canvas, opts) {
     zoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, zoom * factor));
   }
   function setCenter(ra, dec) { ra0 = ra; dec0 = dec; }
+
+  // Adapt the ink (lines, labels, star names, stars, Milky Way, reflections) to a light or dark bg.
+  function setLightMode(light) {
+    isLight = !!light;
+    if (isLight) {
+      LABEL_COLOR = "rgba(55,70,115,0.85)";
+      LINE_COLOR  = "rgba(70,95,150,0.5)";
+      STARNAME_COLOR = "rgba(35,50,90,0.85)";
+    } else {
+      LABEL_COLOR = "rgba(150,170,225,0.55)";
+      LINE_COLOR  = "rgba(130,160,225,0.28)";
+      STARNAME_COLOR = "rgba(220,228,255,0.6)";
+    }
+  }
 
   // Smoothly carry the view centre to (ra,dec) over `ms`, easing in and out. The
   // save celebration uses this to bring a freshly placed reflection star to the
@@ -309,7 +329,7 @@ function createSkyMap(canvas, opts) {
   }
 
   return {
-    load, setSize, render, setReflections, pan, zoomBy, setCenter, hitTest, animateTo,
+    load, setSize, render, setReflections, pan, zoomBy, setCenter, setLightMode, hitTest, animateTo,
     getRef: (id) => placed.find((p) => p.id === id) || null,
     isLoaded: () => loaded,
     getZoom: () => zoom

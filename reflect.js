@@ -84,6 +84,7 @@ let skyDragging = false;
 let appSettings = null;     // cached settings (for forceBreak routing on proceed)
 let celebrating = false;    // save celebration playing → hide wand, freeze the sky
 let lastSummonSrc = "";     // the star image you summoned, reused in the celebration
+let isLightBg = false;      // light star-map background → draw the wand trail/sparkles in dark warm ink
 let skyLastX = 0, skyLastY = 0;
 let skyRaf = 0;             // coalesces pan/zoom redraws to one per animation frame
 
@@ -261,10 +262,10 @@ function setupCanvas() {
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
 function drawSparkle(x, y, s) {
-  ctx.strokeStyle = "rgba(255,225,150,0.95)";
+  ctx.strokeStyle = isLightBg ? "rgba(150,85,5,0.95)" : "rgba(255,225,150,0.95)";
   ctx.lineWidth = Math.max(1, s * 0.5);
   ctx.lineCap = "round";
-  ctx.shadowBlur = 8; ctx.shadowColor = "rgba(255,210,120,0.95)";
+  ctx.shadowBlur = 8; ctx.shadowColor = isLightBg ? "rgba(150,85,5,0.55)" : "rgba(255,210,120,0.95)";
   ctx.beginPath();
   ctx.moveTo(x - s, y); ctx.lineTo(x + s, y);
   ctx.moveTo(x, y - s); ctx.lineTo(x, y + s);
@@ -351,14 +352,14 @@ function trailFrame() {
 
         // Pass 1: wide soft glow
         prevMid = passStartMid; strokedCtrlIdx = passStartCtrl;
-        ctx.strokeStyle = "rgba(255,205,110,0.22)";
-        ctx.lineWidth = 16; ctx.shadowBlur = 18; ctx.shadowColor = "rgba(255,200,110,0.55)";
+        ctx.strokeStyle = isLightBg ? "rgba(200,120,15,0.3)" : "rgba(255,205,110,0.22)";
+        ctx.lineWidth = 16; ctx.shadowBlur = 18; ctx.shadowColor = isLightBg ? "rgba(190,110,15,0.5)" : "rgba(255,200,110,0.55)";
         strokeNewRibbonSegments();
 
         // Pass 2: thin bright core (identical geometry)
         prevMid = passStartMid; strokedCtrlIdx = passStartCtrl;
-        ctx.strokeStyle = "rgba(255,236,175,0.9)";
-        ctx.lineWidth = 5; ctx.shadowBlur = 8; ctx.shadowColor = "rgba(255,200,110,0.55)";
+        ctx.strokeStyle = isLightBg ? "rgba(150,80,5,0.95)" : "rgba(255,236,175,0.9)";
+        ctx.lineWidth = 5; ctx.shadowBlur = 8; ctx.shadowColor = isLightBg ? "rgba(190,110,15,0.5)" : "rgba(255,200,110,0.55)";
         const endMid = strokeNewRibbonSegments();
 
         ctx.restore();   // resets shadowBlur/shadowColor so no glow leaks into drawSparkle
@@ -966,6 +967,20 @@ nativeCursorZone(winToggle);
   try { settings = await chrome.runtime.sendMessage({ type: "getSettings" }); } catch (e) {}
   appSettings = settings;
   if (settings && isThemeLight(settings.background)) document.body.classList.add("compose-light");
+
+  // user-defined star-map background; flip the screen + sky ink to stay readable on light colours
+  const starmapBg = await loadStarmapBg();
+  document.body.style.background = starmapBg;
+  let skyLight = false;
+  const bgHex = /^#?([0-9a-f]{6})$/i.exec((starmapBg || "").trim());
+  if (bgHex) {
+    const bv = parseInt(bgHex[1], 16);
+    skyLight = (0.299 * ((bv >> 16) & 255) + 0.587 * ((bv >> 8) & 255) + 0.114 * (bv & 255)) > 150;
+  }
+  document.body.style.color = skyLight ? "#1a1a1a" : "#fff";
+  isLightBg = skyLight;
+  if (skyLight) document.body.classList.add("starmap-light");
+
   washFromBg();
   await initCountdown();
 
@@ -979,6 +994,7 @@ nativeCursorZone(winToggle);
   reflectionLog = await loadReflectionLog();
 
   sky = createSkyMap(skymapCanvas, {});
+  sky.setLightMode(skyLight);
   sky.setSize();
   try { await sky.load((p) => chrome.runtime.getURL(p)); } catch (e) {}
   renderStars();

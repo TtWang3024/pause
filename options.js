@@ -461,11 +461,14 @@ saveBtn.addEventListener("click", async () => {
 (function reflectionsModule() {
   const winButtons = document.querySelectorAll(".rwin-btn");
   const reduceMotionBox = document.getElementById("reduce-motion");
+  const starmapBgBox = document.getElementById("starmap-bg");
   const feelingsEditor = document.getElementById("feelings-editor");
   const reflectionsList = document.getElementById("reflections-list");
   const reflectionsCount = document.getElementById("reflections-count");
 
   reduceMotionBox.addEventListener("change", () => saveReduceMotion(reduceMotionBox.checked));
+  starmapBgBox.addEventListener("change", () => saveStarmapBg(starmapBgBox.value));
+  loadStarmapBg().then((hex) => { starmapBgBox.value = hex; });
 
   // Each title reads: (arousal icon) high/low arousal · (valence icon) positive/negative
   const Q_PARTS = {

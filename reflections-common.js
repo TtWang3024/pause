@@ -63,6 +63,15 @@ async function saveReduceMotion(on) {
   await chrome.storage.sync.set({ reflectReduceMotion: !!on });
 }
 
+// User-defined star-map background colour (the reflection screen adapts its ink to it).
+async function loadStarmapBg() {
+  const { reflectStarmapBg } = await chrome.storage.sync.get("reflectStarmapBg");
+  return reflectStarmapBg || "#04040a";
+}
+async function saveStarmapBg(hex) {
+  await chrome.storage.sync.set({ reflectStarmapBg: hex || "#04040a" });
+}
+
 // --- star derivation ---
 // Flatten the log into one star per thought / body / mood within the window.
 // One headline string for a reflection's star: the top (first) thought; else all

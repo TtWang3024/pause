@@ -279,6 +279,8 @@ body.celebrating { cursor: default; }
 .cel-line { margin: 7px 0; font-weight: 600; font-size: 19px; color: #fff; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.65); }
 .cel-line:last-child { font-size: 16px; opacity: 0.92; }
 #celebrate-name { color: #ffe08a; }
+body.starmap-light .cel-line { color: #1a1a1a; text-shadow: 0 1px 10px rgba(255, 255, 255, 0.7); }
+body.starmap-light #celebrate-name { color: #9a5e00; }
 #celebrate-continue {
   position: absolute; left: 50%; top: 78%; transform: translateX(-50%);
   pointer-events: auto; opacity: 0; transition: opacity 0.8s ease;
