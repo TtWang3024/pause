@@ -505,6 +505,7 @@ function renderBodyTags() {
   bodyTags.forEach((t, i) => {
     const row = document.createElement("div");
     row.className = "body-tag";
+    if (SENSE_PARTS.includes(t.part) && t.part !== "head area") row.classList.add("sense"); // pink box for the five senses
     const head = document.createElement("div");
     head.className = "body-tag-head";
     const grip = document.createElement("span");

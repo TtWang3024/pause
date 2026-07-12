@@ -190,6 +190,11 @@ body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,6
 .body-tag .x { border: none; background: rgba(0,0,0,0.18); color: inherit; border-radius: 999px; padding: 1px 7px; cursor: pointer; font-size: 13px; line-height: 1; }
 .body-tag input { width: 100%; font-family: inherit; font-size: 16px; padding: 9px 12px; border-radius: 7px; border: 1px solid rgba(128,128,128,0.4); background: rgba(128,128,128,0.1); color: inherit; }
 .body-tag input::placeholder { color: inherit; opacity: 0.4; }
+/* The five senses get a pink tag box + pink type-in field, set apart from the grey body parts. */
+.body-tag.sense { background: #f8d7e3; color: #111; }
+.body-tag.sense .x { background: rgba(0,0,0,0.14); }
+.body-tag.sense input { background: #fff5f8; border-color: #e29ab8; }
+.body-tag.sense input::placeholder { color: #b06a86; opacity: 0.7; }
 
 /* Russell circumplex mood map: four quadrants joined into one block, big axis icons at the arrow tips */
 #circumplex { position: relative; padding: 0; --cx-line: #3a3a3a; }
