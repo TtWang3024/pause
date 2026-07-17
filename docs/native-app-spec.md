@@ -102,4 +102,15 @@ No stats, no themes, no schedules. Ship that, live with it for a week, then deci
 
 ---
 
+## Android v1 decisions (2026-07-12)
+
+Locked in with the author; these override the sections above where they differ:
+
+- **Platform:** Android first, developed against the author's daily phone. Sideloaded APK (no Play release for v1; design stays Play-safe: Usage Access polling + overlay, no accessibility service).
+- **Model:** **groups, like the extension** (per-group apps, pause length, allowance) — overrides the "one block set, one window" non-feature above. "Block all by default" ships with a mandatory system allowlist: launcher, dialer/emergency, keyboard (IME), system Settings, alarm/clock, and Hold to Pause itself.
+- **Stack:** native Kotlin + Jetpack Compose. No cross-platform framework. The extension's HTML/JS does not port; its logic, copy, and feel do.
+- **Project:** lives in a sibling folder `pause-android` (own repo), package id `com.ttwang.holdtopause`.
+- **Build route:** command-line SDK + Gradle driven by Claude (no Android Studio required); the author installs the APK on the phone over USB (adb).
+- **Phases:** 1) hello-world APK on the phone → 2) watcher + overlay + hold-to-pause + allowance + auto re-block with one hardcoded group → 3) groups & settings UI → 4) commit/break, then the reflection ritual.
+
 *Origin: grew out of the "Hold to Pause" Chrome extension in this repo. Same philosophy — friction at the moment of impulse, not control over a future self.*
