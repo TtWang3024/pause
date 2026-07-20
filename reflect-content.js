@@ -33,6 +33,16 @@
   const root = host.attachShadow({ mode: "open" });
   (document.body || document.documentElement).appendChild(host);
 
+  // Reloading the extension orphans this script in already-open tabs: any
+  // chrome.* call then throws "Extension context invalidated". Notice the
+  // orphaning and retire quietly instead of erroring.
+  function extAlive() {
+    try { return !!(chrome.runtime && chrome.runtime.id); } catch (e) { return false; }
+  }
+  function retire() {
+    try { host.remove(); } catch (e) {}
+  }
+
   const wandUrl = chrome.runtime.getURL("images/wand.png");
   root.innerHTML = `
     <style>
@@ -185,6 +195,7 @@
 
   root.querySelector(".close").addEventListener("click", () => panel.classList.remove("open"));
   root.querySelector(".save").addEventListener("click", async () => {
+    if (!extAlive()) { retire(); return; }
     const body = bin.value.trim();
     const mood = selectedMood;
     if (!thoughts.length && !body && !mood) { doneEl.textContent = "Nothing to save yet."; return; }
@@ -209,6 +220,7 @@
   const moves = [];
   function summonStar() {
     if (centerStar) return;
+    if (!extAlive()) { retire(); return; }
     const img = document.createElement("img");
     img.className = "summon";
     img.src = chrome.runtime.getURL("images/stars-" + String(1 + Math.floor(Math.random() * 21)).padStart(3, "0") + ".png");
