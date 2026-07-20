@@ -198,7 +198,7 @@ function unlock() {
 }
 
 // ---- the back door (ported from the Android app) ----
-// Breaks longer than 5 minutes only: visible from the start, locked for the
+// On every break: visible from the start, locked for the
 // first 3 minutes, then hold for 20 s. Releasing keeps the progress; the log
 // records the minutes actually rested. No blame words anywhere.
 const returnBtn = document.getElementById("return-btn");
@@ -334,8 +334,8 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
     unlock();
     return;
   }
-  // The back door only exists on breaks longer than 5 minutes, and only
-  // when Options allows it; its lock and hold lengths come from Options too.
+  // The back door rides every break when Options allows it; its lock and
+  // hold lengths come from Options too.
   if (settings && Number.isFinite(settings.backdoorHoldSec)) {
     HOLD_MS = settings.backdoorHoldSec * 1000;
     holdLeft = HOLD_MS;
@@ -343,7 +343,7 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   if (settings && Number.isFinite(settings.backdoorLockMin)) {
     LOCK_MS = settings.backdoorLockMin * 60 * 1000;
   }
-  if (settings?.breakBackdoor !== false && durationMin > 5 && Date.now() < breakEnd) {
+  if (settings?.breakBackdoor !== false && Date.now() < breakEnd) {
     returnBtn.classList.remove("hidden");
     paintBackdoor();
   }
