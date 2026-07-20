@@ -116,9 +116,25 @@ function toggleSelect(a) {
   renderChips();
 }
 
+// The add line lives behind a pill (the Android pattern): the pill reveals
+// the inputs; "+" with an empty name simply folds them away again.
+const addReveal = document.getElementById("add-reveal");
+const addCustom = document.getElementById("add-custom");
+
+function foldAddLine() {
+  addCustom.classList.add("hidden");
+  addReveal.classList.remove("hidden");
+}
+
+addReveal.addEventListener("click", () => {
+  addReveal.classList.add("hidden");
+  addCustom.classList.remove("hidden");
+  customName.focus();
+});
+
 async function onCustomAdd() {
   const name = customName.value.trim();
-  if (!name) { customName.focus(); return; }
+  if (!name) { foldAddLine(); return; }
   const tag = customTag.value.trim().replace(/^#/, "");
   const a = { id: genId("a"), name, tag };
   activities.push(a);
@@ -169,6 +185,7 @@ function tick() {
     unlock();
     return;
   }
+  if (!holding) paintBackdoor();   // the hold interval paints while held
   setTimeout(tick, 250);
 }
 
@@ -177,7 +194,95 @@ function unlock() {
   doneBtn.disabled = false;
   doneBtn.classList.add("ready");
   doneBtn.textContent = "I'm done →";
+  returnBtn.classList.add("hidden");     // the break finished by itself
 }
+
+// ---- the back door (ported from the Android app) ----
+// Breaks longer than 5 minutes only: visible from the start, locked for the
+// first 3 minutes, then hold for 20 s. Releasing keeps the progress; the log
+// records the minutes actually rested. No blame words anywhere.
+const returnBtn = document.getElementById("return-btn");
+let HOLD_MS = 20 * 1000;          // both are settable in Options
+let LOCK_MS = 3 * 60 * 1000;
+let holdLeft = HOLD_MS;
+let holding = false;
+let holdTimer = null;
+let holdLast = 0;
+let returned = false;
+
+function backdoorLocked() {
+  return (breakEnd - totalMs) + LOCK_MS - Date.now() > 0;
+}
+
+function paintBackdoor() {
+  if (returned || returnBtn.classList.contains("hidden")) return;
+  const lockedLeft = (breakEnd - totalMs) + LOCK_MS - Date.now();
+  if (lockedLeft > 0) {
+    returnBtn.classList.add("locked");
+    returnBtn.textContent = "I choose to return (in " + format(lockedLeft) + ")";
+    return;
+  }
+  returnBtn.classList.remove("locked");
+  const secs = Math.max(1, Math.ceil(holdLeft / 1000));
+  returnBtn.textContent =
+    holding ? "Keep holding… " + secs :
+    holdLeft < HOLD_MS ? "I choose to return · " + secs + "s left" :
+    "I choose to return";
+}
+
+async function completeReturn() {
+  if (returned) return;
+  returned = true;
+  holding = false;
+  if (holdTimer) clearInterval(holdTimer);
+  returnBtn.disabled = true;
+  returnBtn.textContent = "Saving…";
+  // The entry records the real minutes rested, never the promised length.
+  const actualMin = Math.min(durationMin,
+    Math.max(1, Math.round((totalMs - (breakEnd - Date.now())) / 60000)));
+  const log = await loadBreakLog();
+  log.unshift({
+    id: genId("b"),
+    ts: Date.now(),
+    durationMin: actualMin,
+    activities: Array.from(selected.values()),
+    ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
+  });
+  await saveBreakLog(log);
+  await chrome.runtime.sendMessage({ type: "endBreakEarly", groupId });
+  const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
+  location.replace(chrome.runtime.getURL(entry) +
+    "?url=" + encodeURIComponent(targetUrl) +
+    "&group=" + encodeURIComponent(groupId));
+}
+
+function startHold() {
+  if (returned || unlocked || backdoorLocked()) return;
+  if (holding) return;
+  holding = true;
+  holdLast = Date.now();
+  returnBtn.classList.add("holding");
+  holdTimer = setInterval(() => {
+    const t = Date.now();
+    holdLeft = Math.max(0, holdLeft - (t - holdLast));
+    holdLast = t;
+    paintBackdoor();
+    if (holdLeft <= 0) completeReturn();
+  }, 100);
+}
+
+function stopHold() {
+  if (!holding) return;
+  holding = false;                        // progress is kept, not reset
+  returnBtn.classList.remove("holding");
+  if (holdTimer) clearInterval(holdTimer);
+  paintBackdoor();
+}
+
+returnBtn.addEventListener("pointerdown", (e) => { e.preventDefault(); startHold(); });
+returnBtn.addEventListener("pointerup", stopHold);
+returnBtn.addEventListener("pointercancel", stopHold);
+returnBtn.addEventListener("pointerleave", stopHold);
 
 async function onDone() {
   if (!unlocked) return;
@@ -228,6 +333,19 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
     progressFillEl.style.width = "100%";
     unlock();
     return;
+  }
+  // The back door only exists on breaks longer than 5 minutes, and only
+  // when Options allows it; its lock and hold lengths come from Options too.
+  if (settings && Number.isFinite(settings.backdoorHoldSec)) {
+    HOLD_MS = settings.backdoorHoldSec * 1000;
+    holdLeft = HOLD_MS;
+  }
+  if (settings && Number.isFinite(settings.backdoorLockMin)) {
+    LOCK_MS = settings.backdoorLockMin * 60 * 1000;
+  }
+  if (settings?.breakBackdoor !== false && durationMin > 5 && Date.now() < breakEnd) {
+    returnBtn.classList.remove("hidden");
+    paintBackdoor();
   }
   tick();
 })();

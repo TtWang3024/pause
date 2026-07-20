@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Break</title>
-  <link rel="stylesheet" href="break.css" />
+  <link rel="stylesheet" href="break.css?v=2" />
 </head>
 <body>
   <main id="stage">
@@ -19,20 +19,25 @@
         <button class="rate-opt" type="button" data-v="0"><span class="rate-glyph">◐</span>Some of it</button>
         <button class="rate-opt" type="button" data-v="1"><span class="rate-glyph">●</span>Yes, that</button>
       </div>
-      <p id="rating-help">Tap if you like. No wrong answer.</p>
     </div>
 
-    <p id="pick-hint">Pick up to 3 things to do</p>
+    <div id="pick-row">
+      <p id="pick-hint">Pick up to 3 things to do</p>
+      <button id="add-reveal" type="button">+ Add an activity</button>
+    </div>
     <div id="activity-list"></div>
-
-    <div id="add-custom">
+    <div id="add-custom" class="hidden">
       <input id="custom-name" type="text" placeholder="something else…" autocomplete="off" spellcheck="false" />
       <input id="custom-tag" type="text" placeholder="tag" autocomplete="off" spellcheck="false" />
       <button id="custom-add" title="Add and select">+</button>
     </div>
 
-    <button id="done-btn" disabled>Break in progress</button>
-    <p id="footnote">The break must finish before you continue.</p>
+    <!-- The back door (ported from the Android app): breaks longer than 5
+         minutes only; locked for the first 3 minutes, then hold to return. -->
+    <div id="end-row">
+      <button id="return-btn" class="hidden" type="button">I choose to return</button>
+      <button id="done-btn" disabled>Break in progress</button>
+    </div>
   </main>
   <script src="breaks-common.js"></script>
   <script src="break.js"></script>

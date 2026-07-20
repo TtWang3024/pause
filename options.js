@@ -9,7 +9,10 @@ const DEFAULT_SETTINGS = {
   resetOnRelease: false,
   forceBreak: false,
   magicStars: true,
-  breakMessage: "Step away from the screen. Stretch. Breathe."
+  breakMessage: "Step away from the screen. Stretch. Breathe.",
+  breakBackdoor: true,
+  backdoorLockMin: 3,
+  backdoorHoldSec: 20
 };
 
 const groupsEl = document.getElementById("groups");
@@ -23,6 +26,9 @@ const resetOnReleaseEl = document.getElementById("reset-on-release");
 const forceBreakEl = document.getElementById("force-break");
 const magicStarsEl = document.getElementById("magic-stars");
 const breakMessageEl = document.getElementById("break-message");
+const backdoorEnabledEl = document.getElementById("backdoor-enabled");
+const backdoorLockEl = document.getElementById("backdoor-lock");
+const backdoorHoldEl = document.getElementById("backdoor-hold");
 const breakOptionsEl = document.getElementById("break-message-section");
 const tpl = document.getElementById("group-template");
 
@@ -160,7 +166,10 @@ saveBtn.addEventListener("click", async () => {
     resetOnRelease: resetOnReleaseEl.checked,
     forceBreak: forceBreakEl.checked,
     magicStars: magicStarsEl.checked,
-    breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage
+    breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage,
+    breakBackdoor: backdoorEnabledEl.checked,
+    backdoorLockMin: clampInt(backdoorLockEl.value, 0, 15, 3),
+    backdoorHoldSec: clampInt(backdoorHoldEl.value, 5, 60, 20)
   };
   await chrome.storage.sync.set({ settings });
   statusEl.textContent = "Saved.";
@@ -179,6 +188,9 @@ saveBtn.addEventListener("click", async () => {
   forceBreakEl.checked = !!s.forceBreak;
   magicStarsEl.checked = s.magicStars !== false;
   breakMessageEl.value = s.breakMessage ?? DEFAULT_SETTINGS.breakMessage;
+  backdoorEnabledEl.checked = s.breakBackdoor !== false;
+  backdoorLockEl.value = s.backdoorLockMin ?? 3;
+  backdoorHoldEl.value = s.backdoorHoldSec ?? 20;
   syncBreakVisibility();
 })();
 

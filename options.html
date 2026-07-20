@@ -79,6 +79,19 @@
           <textarea id="break-message" rows="3" placeholder="Words to read while you cool down"></textarea>
         </section>
 
+        <section id="backdoor-section">
+          <h2>Ending a break early</h2>
+          <p class="help">On breaks longer than 5 minutes, a hold-to-return button offers a way back. Ending early is a choice, not a failure: the log keeps the minutes you actually rested.</p>
+          <label class="toggle">
+            <input id="backdoor-enabled" type="checkbox" />
+            <span>Allow ending a break early</span>
+          </label>
+          <p class="backdoor-row">The button unlocks after
+            <input id="backdoor-lock" type="number" min="0" max="15" step="1" /> minutes of the break.</p>
+          <p class="backdoor-row">Hold it for
+            <input id="backdoor-hold" type="number" min="5" max="60" step="5" /> seconds to return.</p>
+        </section>
+
         <section>
           <h2>Break stats</h2>
           <p class="help">What you reach for on breaks.</p>

@@ -21,7 +21,10 @@ const DEFAULT_SETTINGS = {
   resetOnRelease: false,
   forceBreak: false,
   magicStars: true,
-  breakMessage: "Step away from the screen. Stretch. Breathe."
+  breakMessage: "Step away from the screen. Stretch. Breathe.",
+  breakBackdoor: true,
+  backdoorLockMin: 3,
+  backdoorHoldSec: 20
 };
 
 const BREAK_MIN = 1;
@@ -261,6 +264,16 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   if (msg?.type === "getSettings") {
     getSettings().then((s) => sendResponse(s));
+    return true;
+  }
+  // The break page's back door: the break ends now by choice. Clearing the
+  // group state means the next visit pays the normal entry ritual again.
+  if (msg?.type === "endBreakEarly" && msg.groupId) {
+    (async () => {
+      await setGroupState(msg.groupId, null);
+      await chrome.alarms.clear("expire:" + msg.groupId);
+      sendResponse({ ok: true });
+    })();
     return true;
   }
   // Content script asks whether to show the on-site reflect wand: only while
