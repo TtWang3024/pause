@@ -1008,9 +1008,13 @@ continueBtn.addEventListener("pointerdown", (e) => {
   paintCountdown();
   startCountdown();
 });
+let suppressHoldClick = false;
 const endContinueHold = () => {
   if (!holdActive) return;
   holdActive = false;
+  // The release also synthesizes a click; swallow it so finishing the hold
+  // still asks for one deliberate click on "Continue →".
+  suppressHoldClick = true;
   haltCountdown();
   paintCountdown();
 };
@@ -1049,7 +1053,10 @@ async function proceed() {
   try { await chrome.runtime.sendMessage({ type: "grantAllowance", groupId }); } catch (e) {}
   location.replace(targetUrl);
 }
-continueBtn.addEventListener("click", proceed);
+continueBtn.addEventListener("click", () => {
+  if (suppressHoldClick) { suppressHoldClick = false; return; }
+  proceed();
+});
 
 // ---------- window toggle ----------
 function paintToggle() {

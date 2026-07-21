@@ -13,7 +13,7 @@ const DEFAULT_SETTINGS = {
   breakBackdoor: true,
   backdoorLockMin: 3,
   backdoorHoldSec: 20,
-  holdToContinue: false
+  holdToContinue: true
 };
 
 const groupsEl = document.getElementById("groups");
