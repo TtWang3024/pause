@@ -333,3 +333,91 @@ body.reduce-motion .summon-star { animation: summon-pop 0.4s cubic-bezier(0.2, 1
   0%, 100% { opacity: 0.55; transform: var(--pos) scale(0.85); }
   50%      { opacity: 1;    transform: var(--pos) scale(1.25); }
 }
+
+/* The front door: a dark card floating over the sky, after the compose. */
+#rank {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.6);
+}
+
+#rank.hidden { display: none; }
+
+#rank-card {
+  width: min(560px, 92vw);
+  max-height: 90vh;
+  overflow-y: auto;
+  background: #101820;
+  color: #f2f2f2;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 16px;
+  padding: 22px 24px 24px;
+}
+
+#rank-title { margin: 0; font-size: 22px; }
+#rank-sub { margin: 4px 0 14px; font-size: 13px; opacity: 0.65; }
+
+#rank-state {
+  border: 2px solid #f2f2f2;
+  border-radius: 14px;
+  padding: 12px 14px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+#rank-label { margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
+#rank-key { margin: 6px 0 0; font-size: 18px; font-weight: 700; }
+#rank-goal-echo { margin: 4px 0 0; font-size: 13px; opacity: 0.75; }
+#rank-goal-echo:empty { display: none; }
+
+#rank-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+
+.rank-pill {
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid #f2f2f2;
+  background: transparent;
+  color: #f2f2f2;
+  cursor: pointer;
+}
+
+.rank-pill.on { background: #f2f2f2; color: #101820; }
+
+#rank-new, #rank-goal {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+  background: transparent;
+  color: #f2f2f2;
+  margin-bottom: 4px;
+}
+
+#rank-new::placeholder, #rank-goal::placeholder { color: #f2f2f2; opacity: 0.4; }
+
+#rank-goal-label { margin: 10px 0 6px; font-size: 13px; font-weight: 600; }
+
+#rank-doors { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
+
+#rank-doors button {
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 12px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: #f2f2f2;
+  cursor: pointer;
+}
+
+#rank-doors button:disabled { opacity: 0.4; cursor: default; }

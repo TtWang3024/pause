@@ -731,6 +731,7 @@ function refreshSaveLabel() { if (pauseDone && !celebrating) saveBtn.textContent
 
 async function saveReflection() {
   if (!pauseDone || celebrating) return;           // gated by the countdown; ignore double clicks
+  if (targetUrl) { openRank(); return; }           // the unlock flow passes the front door
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
@@ -746,6 +747,92 @@ async function saveReflection() {
   celebrate(entry.id);
 }
 saveBtn.addEventListener("click", saveReflection);
+
+// ---- the front door (Android parity): a thought AND the aim it serves ----
+// Both doors light the star; only the chosen one decides where you go next.
+const rankEl = document.getElementById("rank");
+const rankPillsEl = document.getElementById("rank-pills");
+const rankKeyEl = document.getElementById("rank-key");
+const rankGoalEcho = document.getElementById("rank-goal-echo");
+const rankNewEl = document.getElementById("rank-new");
+const rankGoalEl = document.getElementById("rank-goal");
+const rankUnlockBtn = document.getElementById("rank-unlock");
+const rankElseBtn = document.getElementById("rank-else");
+let rankKey = null;
+let rankIsNew = false;
+let rankIntentUnlock = true;
+let rankSaving = false;
+
+function rankReady() { return !!rankKey && rankGoalEl.value.trim().length > 0; }
+
+function refreshRank() {
+  rankKeyEl.textContent = rankKey || "…";
+  rankKeyEl.style.opacity = rankKey ? "1" : "0.4";
+  const g = rankGoalEl.value.trim();
+  rankGoalEcho.textContent = g ? "for: " + g : "";
+  rankUnlockBtn.disabled = !rankReady();
+  rankElseBtn.disabled = !rankReady();
+}
+
+function openRank() {
+  try { rankUnlockBtn.textContent = "I'll unlock " + new URL(targetUrl).hostname.replace(/^www\./, ""); }
+  catch (e) { rankUnlockBtn.textContent = "I'll unlock this site"; }
+  rankPillsEl.innerHTML = "";
+  for (const t of thoughts) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "rank-pill";
+    b.textContent = t;
+    b.addEventListener("click", () => {
+      rankKey = t; rankIsNew = false; rankNewEl.value = "";
+      rankPillsEl.querySelectorAll(".rank-pill").forEach((p) => p.classList.toggle("on", p === b));
+      refreshRank();
+    });
+    rankPillsEl.appendChild(b);
+  }
+  refreshRank();
+  rankEl.classList.remove("hidden");
+  if (!thoughts.length) rankNewEl.focus();
+}
+
+rankNewEl.addEventListener("input", () => {
+  const v = rankNewEl.value.trim();
+  if (v) {
+    rankKey = v; rankIsNew = true;
+    rankPillsEl.querySelectorAll(".rank-pill").forEach((p) => p.classList.remove("on"));
+  } else if (rankIsNew) {
+    rankKey = null;
+  }
+  refreshRank();
+});
+rankGoalEl.addEventListener("input", refreshRank);
+
+async function finishRank(unlock) {
+  if (!rankReady() || rankSaving) return;
+  rankSaving = true;
+  rankIntentUnlock = unlock;
+  const key = rankKey;
+  const goal = rankGoalEl.value.trim();
+  if (rankIsNew && !thoughts.includes(key)) thoughts.push(key);
+  const body = bodyTags
+    .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
+    .filter((t) => t.part);
+  const mood = sortedMoods().map((m) => m.name);
+  const entry = {
+    id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood,
+    keyThought: key + " · " + goal
+  };
+  reflectionLog.unshift(entry);
+  await saveReflectionLog(reflectionLog);
+  renderStars();
+  await clearPauseRemaining();
+  rankEl.classList.add("hidden");
+  rankSaving = false;
+  celebrate(entry.id);
+}
+
+rankUnlockBtn.addEventListener("click", () => finishRank(true));
+rankElseBtn.addEventListener("click", () => finishRank(false));
 
 // The compose shrinks into the summoned star, which is then carried to its real
 // place in the sky; its real name and a thank-you line fade in. A "Continue" goes on.
@@ -808,7 +895,11 @@ function dismissCelebration() {
   if (bottomEl) bottomEl.classList.remove("hide");
   updateWand();
 }
-celebrateContinue.addEventListener("click", () => { if (targetUrl) proceed(); else dismissCelebration(); });
+celebrateContinue.addEventListener("click", () => {
+  // The else-door still lights the star, but leads away instead of onward.
+  if (targetUrl && !rankIntentUnlock) { location.replace("about:blank"); return; }
+  if (targetUrl) proceed(); else dismissCelebration();
+});
 composeClose.addEventListener("click", () => { resetFields(); closeCompose(); });
 composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) { resetFields(); closeCompose(); } });
 
@@ -823,7 +914,13 @@ let pauseRaf = 0;
 let pauseLastTick = 0;
 let pauseReady = false;     // true once the persisted remaining is loaded (guards early saves)
 
-function countdownCanRun() { return !document.hidden && document.hasFocus(); }
+function holdMode() { return !!(appSettings && appSettings.holdToContinue); }
+let holdActive = false;
+
+function countdownCanRun() {
+  if (holdMode() && !holdActive) return false;   // hold-to-count-down: only while pressed
+  return !document.hidden && document.hasFocus();
+}
 
 function paintCountdown() {
   if (pauseDone) {
@@ -834,9 +931,15 @@ function paintCountdown() {
     return;
   }
   const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
-  continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
+  if (holdMode()) {
+    continueBtn.innerHTML = holdActive
+      ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
+      : 'Continue \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
+  } else {
+    continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
+  }
   saveBtn.innerHTML = saveLabel() + ' (in <span class="cd-num">' + secs + '</span>s)';
-  continueBtn.disabled = true;
+  continueBtn.disabled = holdMode() ? false : true;   // must stay pressable to hold
   saveBtn.disabled = true;
 }
 
@@ -895,6 +998,25 @@ async function clearPauseRemaining() {
     await chrome.storage.local.set({ pauseCountdowns });
   } catch (e) {}
 }
+
+// Hold-to-count-down: pressing the Continue button runs the countdown;
+// releasing (or sliding off) freezes it, progress kept and persisted.
+continueBtn.addEventListener("pointerdown", (e) => {
+  if (!holdMode() || pauseDone) return;
+  e.preventDefault();
+  holdActive = true;
+  paintCountdown();
+  startCountdown();
+});
+const endContinueHold = () => {
+  if (!holdActive) return;
+  holdActive = false;
+  haltCountdown();
+  paintCountdown();
+};
+continueBtn.addEventListener("pointerup", endContinueHold);
+continueBtn.addEventListener("pointercancel", endContinueHold);
+continueBtn.addEventListener("pointerleave", endContinueHold);
 
 window.addEventListener("blur", haltCountdown);
 window.addEventListener("focus", startCountdown);

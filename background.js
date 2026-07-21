@@ -24,7 +24,8 @@ const DEFAULT_SETTINGS = {
   breakMessage: "Step away from the screen. Stretch. Breathe.",
   breakBackdoor: true,
   backdoorLockMin: 3,
-  backdoorHoldSec: 20
+  backdoorHoldSec: 20,
+  holdToContinue: false
 };
 
 const BREAK_MIN = 1;
