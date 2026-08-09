@@ -919,7 +919,7 @@ let holdActive = false;
 
 function countdownCanRun() {
   if (holdMode() && !holdActive) return false;   // hold-to-count-down: only while pressed
-  return !document.hidden && document.hasFocus();
+  return !document.hidden;   // tick whenever the tab is visible; a visible-but-unfocused window must not freeze it (app-switch still pauses via the blur listener)
 }
 
 function paintCountdown() {
@@ -954,7 +954,7 @@ function finishCountdown() {
 function tickCountdown(now) {
   pauseRaf = 0;
   if (pauseDone) return;
-  if (!countdownCanRun()) return;            // focus lost mid-frame → stop (resumes on focus)
+  if (!countdownCanRun()) return;            // tab hidden mid-frame → stop (resumes on visible/focus)
   const dt = now - pauseLastTick;
   pauseLastTick = now;
   pauseRemaining -= dt;
