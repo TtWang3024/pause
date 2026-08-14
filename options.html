@@ -12,7 +12,7 @@
   </header>
 
   <div class="save-bar">
-    <button id="save" class="primary save-btn"><img src="images/save.png" alt="" class="save-ico" />Save</button>
+    <button id="save" class="primary save-btn"><span class="save-ico" aria-hidden="true"></span>Save</button>
     <span id="status"></span>
     <span class="save-note">Saves groups, pause, background &amp; break settings. Break activities and history save on their own.</span>
   </div>
@@ -120,7 +120,7 @@
           <div class="activity-add-row">
             <input id="new-activity-name" type="text" placeholder="activity name" autocomplete="off" />
             <input id="new-activity-tag" type="text" placeholder="area / tag" autocomplete="off" />
-            <button id="add-activity" class="add-icon-btn" title="Add"><img src="images/add.png" alt="add" /></button>
+            <button id="add-activity" class="add-icon-btn" title="Add"><span class="add-ico" aria-hidden="true"></span></button>
           </div>
         </section>
 
@@ -191,7 +191,7 @@
         <label>Pause
           <input class="group-seconds" type="number" min="1" max="600" step="1" /> sec
         </label>
-        <button class="delete-group" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>
+        <button class="delete-group" title="Delete"><span class="btn-icon ico-delete" aria-hidden="true"></span></button>
       </div>
       <textarea class="group-sites" placeholder="one site per line, e.g.&#10;youtube.com&#10;reddit.com/r/funny" rows="4"></textarea>
       <div class="schedule">

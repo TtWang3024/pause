@@ -346,3 +346,21 @@ body.theme-white {
   margin-top: 14px;
   width: min(680px, 100%);
 }
+
+/* ---- the urge wave, continuing from the reflection screen ---- */
+#urge-wave { width: min(680px, 100%); margin: 4px 0 0; text-align: left; }
+#urge-wave.hidden { display: none; }
+#uw-prompt { margin: 0 0 8px; font-size: 15px; opacity: 0.75; }
+#uw-row { display: flex; gap: 8px; align-items: stretch; }
+#uw-lvls { display: flex; flex-direction: column; justify-content: space-between; }
+.uw-lvl {
+  width: 26px; height: 26px; border-radius: 50%; padding: 0;
+  border: 1px solid rgba(128,128,128,0.5); background: rgba(128,128,128,0.12);
+  color: inherit; font-family: inherit; font-size: 11px; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.uw-lvl:hover { border-color: #6aa3ff; color: #6aa3ff; }
+#uw-chart { flex: 1 1 auto; min-width: 0; height: 140px; background: rgba(128,128,128,0.1); border-radius: 10px; }
+#uw-now { stroke: rgba(128,128,128,0.8); stroke-width: 1; stroke-dasharray: 3 4; }
+#uw-path { fill: none; stroke: url(#uw-grad); stroke-width: 2; stroke-linecap: round; }
+.uw-grid-line { stroke: rgba(128,128,128,0.25); stroke-width: 0.75; }

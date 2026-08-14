@@ -3,6 +3,7 @@ const targetUrl = params.get("url");
 const breakEnd = parseInt(params.get("end"), 10);
 const groupId = params.get("group") || "";
 const minsParam = parseInt(params.get("mins"), 10);
+const solo = params.get("solo") === "1";   // "Relax my body first": a standalone break, nothing unlocks after
 
 const messageEl = document.getElementById("message");
 const timeLeftEl = document.getElementById("time-left");
@@ -172,6 +173,117 @@ function bindRating(groupLabel) {
   });
 }
 
+// ---- the urge wave rides through the break: same reflection entry, same curve ----
+const uwEl = document.getElementById("urge-wave");
+const uwGrid = document.getElementById("uw-grid");
+const uwNow = document.getElementById("uw-now");
+const uwPath = document.getElementById("uw-path");
+const uwDots = document.getElementById("uw-dots");
+const UW_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
+const UW_X0 = 10, UW_X1 = 392, UW_Y0 = 130, UW_YSPAN = 118;
+const UW_MIN_SPAN = 60000;
+let urgeEntry = null;       // the reflection entry whose wave this break extends
+let uwSaving = false;
+
+function uwY(v) { return UW_Y0 - (v / 10) * UW_YSPAN; }
+function uwX(ts, now) {
+  const pts = urgeEntry.wave;
+  const t0 = pts.length ? pts[0].ts : urgeEntry.ts;
+  const span = Math.max(UW_MIN_SPAN, now - t0);
+  return UW_X0 + Math.min(1, (ts - t0) / span) * (UW_X1 - UW_X0);
+}
+function uwRender() {
+  if (!urgeEntry) return;
+  const pts = urgeEntry.wave;
+  const now = Date.now();
+  uwDots.innerHTML = "";
+  for (const p of pts) {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", uwX(p.ts, now).toFixed(1));
+    c.setAttribute("cy", uwY(p.v).toFixed(1));
+    c.setAttribute("r", "3.5");
+    c.setAttribute("fill", UW_COLORS[p.v] || "#5b96f5");
+    uwDots.appendChild(c);
+  }
+  const nx = uwX(now, now).toFixed(1);
+  uwNow.setAttribute("x1", nx); uwNow.setAttribute("x2", nx);
+  if (pts.length < 2) { uwPath.setAttribute("d", ""); return; }
+  const P = pts.map((p) => [uwX(p.ts, now), uwY(p.v)]);
+  let d = "M" + P[0][0].toFixed(1) + "," + P[0][1].toFixed(1);
+  for (let i = 0; i < P.length - 1; i++) {   // catmull-rom → cubic bezier, kink-free
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    d += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + "," + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
+         " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + "," + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
+         " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
+  }
+  uwPath.setAttribute("d", d);
+}
+let uwDirty = false;
+async function uwPersist() {
+  uwDirty = true;
+  if (uwSaving) return;                      // the running pass loops again for us
+  uwSaving = true;
+  while (uwDirty) {
+    uwDirty = false;
+    try {
+      const log = await loadReflectionLog();
+      const i = log.findIndex((r) => r.id === urgeEntry.id);
+      if (i < 0) break;
+      // merge with whatever another screen may have written; ts + level identifies a tap
+      const stored = Array.isArray(log[i].wave) ? log[i].wave : [];
+      const seen = new Set(urgeEntry.wave.map((p) => p.ts + ":" + p.v));
+      for (const p of stored) if (!seen.has(p.ts + ":" + p.v)) urgeEntry.wave.push(p);
+      urgeEntry.wave.sort((a, b) => a.ts - b.ts);
+      log[i] = urgeEntry;
+      await saveReflectionLog(log);
+    } catch (e) { break; }
+  }
+  uwSaving = false;
+}
+async function initUrgeWave() {
+  try {
+    const { activeUrge } = await chrome.storage.local.get("activeUrge");
+    if (!activeUrge || activeUrge.group !== groupId) return;
+    if (Date.now() - activeUrge.ts > 6 * 60 * 60 * 1000) return;   // a stale session, leave it be
+    const log = await loadReflectionLog();
+    const entry = log.find((r) => r.id === activeUrge.refId);
+    if (!entry) return;
+    if (!Array.isArray(entry.wave)) entry.wave = [];
+    urgeEntry = entry;
+  } catch (e) { return; }
+  [0, 2, 4, 6, 8, 10].forEach((v) => {
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", UW_X0); l.setAttribute("x2", UW_X1);
+    l.setAttribute("y1", uwY(v)); l.setAttribute("y2", uwY(v));
+    l.setAttribute("class", "uw-grid-line");
+    uwGrid.appendChild(l);
+  });
+  uwEl.classList.remove("hidden");
+  document.querySelectorAll(".uw-lvl").forEach((b) => {
+    b.addEventListener("click", () => {
+      urgeEntry.wave.push({ ts: Date.now(), v: parseInt(b.dataset.v, 10) });
+      uwRender();
+      uwPersist();
+    });
+  });
+  uwRender();
+  setInterval(() => { if (urgeEntry && urgeEntry.wave.length) uwRender(); }, 1000);
+}
+async function clearActiveUrge() {
+  try {
+    const { activeUrge } = await chrome.storage.local.get("activeUrge");
+    if (activeUrge && activeUrge.group === groupId) await chrome.storage.local.remove("activeUrge");
+  } catch (e) {}
+}
+function closeThisTab() {
+  try {
+    chrome.tabs.getCurrent((tab) => {
+      if (tab && tab.id != null) chrome.tabs.remove(tab.id);
+      else location.replace("about:blank");
+    });
+  } catch (e) { location.replace("about:blank"); }
+}
+
 function tick() {
   const remaining = breakEnd - Date.now();
   timeLeftEl.textContent = format(remaining);
@@ -249,6 +361,8 @@ async function completeReturn() {
     ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
   });
   await saveBreakLog(log);
+  await clearActiveUrge();
+  if (solo) { closeThisTab(); return; }      // a standalone break ends quietly, nothing to unlock
   await chrome.runtime.sendMessage({ type: "endBreakEarly", groupId });
   const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
   location.replace(chrome.runtime.getURL(entry) +
@@ -297,6 +411,8 @@ async function onDone() {
     ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
   });
   await saveBreakLog(log);
+  await clearActiveUrge();
+  if (solo) { closeThisTab(); return; }      // a standalone break ends quietly, nothing to unlock
   // Restart the cycle: re-enter via the reflection screen when Magic Stars is on
   // (its countdown then leads to commit), otherwise the plain hold-to-pause page.
   const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
@@ -323,7 +439,9 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   breakLenEl.textContent = durationMin > 0 ? `${durationMin}-minute break` : "break";
   const gname = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
   const gLabel = (!gname.trim() || gname.trim().toLowerCase() === "default") ? "this group" : gname.trim();
-  bindRating(gLabel);
+  if (solo) ratingEl.style.display = "none";   // nothing was unlocked, so there is nothing to rate
+  else bindRating(gLabel);
+  initUrgeWave();
   activities = await ensureSeededActivities();
   updateHint();
   renderChips();

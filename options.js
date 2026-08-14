@@ -240,7 +240,7 @@ saveBtn.addEventListener("click", async () => {
           <span class="drag-handle">⠿</span>
           <input class="edit-name" />
           <input class="edit-tag" placeholder="tag" />
-          <button class="act-save" title="Save"><img class="btn-icon" src="images/save.png" alt="save" /></button>
+          <button class="act-save" title="Save"><span class="btn-icon ico-save" aria-hidden="true"></span></button>
           <button class="act-cancel" title="Cancel"><img class="btn-icon" src="images/cancel.png" alt="cancel" /></button>`;
         const nameInput = row.querySelector(".edit-name");
         const tagInput = row.querySelector(".edit-tag");
@@ -266,8 +266,8 @@ saveBtn.addEventListener("click", async () => {
           <span class="act-count"></span>
           <span class="act-date"></span>
           <span class="act-tag"></span>
-          <button class="act-edit" title="Edit"><img class="btn-icon" src="images/edit.svg" alt="edit" /></button>
-          <button class="act-delete" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>`;
+          <button class="act-edit" title="Edit"><span class="btn-icon ico-edit" aria-hidden="true"></span></button>
+          <button class="act-delete" title="Delete"><span class="btn-icon ico-delete" aria-hidden="true"></span></button>`;
         row.querySelector(".act-name").textContent = a.name;
         row.querySelector(".act-count").textContent = (count[a.id] || 0) + "×";
         row.querySelector(".act-date").textContent = last[a.id] ? formatShortDate(last[a.id]) : "—";
@@ -392,8 +392,8 @@ saveBtn.addEventListener("click", async () => {
           <div class="break-chips">${chips || '<span class="stat-empty">no activities</span>'}</div>
           <div class="break-edit-add">
             <select class="break-add-select">${options || '<option value="">(no saved activities)</option>'}</select>
-            <button class="break-add-btn add-icon-btn" title="Add"><img src="images/add.png" alt="add" /></button>
-            <button class="break-save act-save" title="Done"><img class="btn-icon" src="images/save.png" alt="done" /></button>
+            <button class="break-add-btn add-icon-btn" title="Add"><span class="add-ico" aria-hidden="true"></span></button>
+            <button class="break-save act-save" title="Done"><span class="btn-icon ico-save" aria-hidden="true"></span></button>
             <button class="break-cancel act-cancel" title="Cancel"><img class="btn-icon" src="images/cancel.png" alt="cancel" /></button>
           </div>`;
 
@@ -437,8 +437,8 @@ saveBtn.addEventListener("click", async () => {
           <span class="break-when">${escapeHtml(formatDateTime(entry.ts))}</span>
           <span class="break-dur">${entry.durationMin}m</span>
           <span class="break-acts"></span>
-          <button class="break-edit" title="Edit"><img class="btn-icon" src="images/edit.svg" alt="edit" /></button>
-          <button class="break-delete" title="Delete"><img class="btn-icon" src="images/delete.svg" alt="delete" /></button>`;
+          <button class="break-edit" title="Edit"><span class="btn-icon ico-edit" aria-hidden="true"></span></button>
+          <button class="break-delete" title="Delete"><span class="btn-icon ico-delete" aria-hidden="true"></span></button>`;
         row.querySelector(".break-acts").textContent = acts;
         row.querySelector(".break-edit").addEventListener("click", () => {
           editingBreakId = entry.id;
@@ -551,7 +551,7 @@ saveBtn.addEventListener("click", async () => {
       input.type = "text"; input.placeholder = "add a feeling…";
       const btn = document.createElement("button");
       btn.type = "button"; btn.className = "add-icon-btn"; btn.title = "Add";
-      const addImg = document.createElement("img"); addImg.src = "images/add.png"; addImg.alt = "add";
+      const addImg = document.createElement("span"); addImg.className = "add-ico"; addImg.setAttribute("aria-hidden", "true");
       btn.appendChild(addImg);
       const add = async () => {
         const v = input.value.trim();
@@ -600,7 +600,7 @@ saveBtn.addEventListener("click", async () => {
       body.innerHTML = lines.join("") || '<div class="rb-line">(empty)</div>';
       const del = document.createElement("button");
       del.className = "break-delete"; del.title = "Delete";
-      del.innerHTML = '<img class="btn-icon" src="images/delete.svg" alt="delete" />';
+      del.innerHTML = '<span class="btn-icon ico-delete" aria-hidden="true"></span>';
       del.addEventListener("click", async () => {
         log = log.filter((x) => x.id !== entry.id);
         await saveReflectionLog(log);

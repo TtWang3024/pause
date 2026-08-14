@@ -197,3 +197,15 @@ button.primary:disabled .target::after {
   color: #2a7a3a;
   text-align: center;
 }
+
+/* the gear takes the button's colour and fills in on hover or keyboard focus */
+.ico-settings {
+  width: 20px; height: 20px; display: block; pointer-events: none;
+  background-color: currentColor;
+  -webkit-mask: url(images/settings-outline.svg) center / contain no-repeat;
+  mask: url(images/settings-outline.svg) center / contain no-repeat;
+}
+#open-settings:hover .ico-settings, #open-settings:focus-visible .ico-settings {
+  -webkit-mask-image: url(images/settings-solid.svg);
+  mask-image: url(images/settings-solid.svg);
+}

@@ -536,6 +536,27 @@ hr {
 .group-tab-add:hover { background: rgba(0, 0, 0, 0.06); color: var(--fg); }
 .group-hidden { display: none; }
 .btn-icon { width: 20px; height: 20px; display: block; pointer-events: none; }
+/* Masked icons take the button's own colour and swap to the solid cut on hover
+   or keyboard focus, so every icon on this page reads the same way. */
+.ico-delete, .ico-save, .ico-edit {
+  background-color: currentColor;
+  -webkit-mask-position: center; mask-position: center;
+  -webkit-mask-size: contain;    mask-size: contain;
+  -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+}
+/* edit is blue and delete is red, so the two destructive-vs-safe actions read apart at a glance */
+.ico-delete { -webkit-mask-image: url(images/delete-outline.svg); mask-image: url(images/delete-outline.svg); background-color: var(--danger); }
+.ico-edit   { -webkit-mask-image: url(images/edit-outline.svg);   mask-image: url(images/edit-outline.svg);   background-color: var(--accent); }
+button:hover .ico-edit, button:focus-visible .ico-edit {
+  -webkit-mask-image: url(images/edit-solid.svg); mask-image: url(images/edit-solid.svg);
+}
+.ico-save   { -webkit-mask-image: url(images/save-outline.svg);   mask-image: url(images/save-outline.svg); }
+button:hover .ico-delete, button:focus-visible .ico-delete {
+  -webkit-mask-image: url(images/delete-solid.svg); mask-image: url(images/delete-solid.svg);
+}
+button:hover .ico-save, button:focus-visible .ico-save {
+  -webkit-mask-image: url(images/save-solid.svg); mask-image: url(images/save-solid.svg);
+}
 
 /* main Save — large labelled button with icon */
 .save-btn {
@@ -545,15 +566,36 @@ hr {
   font-size: 16px;
   padding: 11px 22px;
 }
-.save-ico { width: 22px; height: 22px; pointer-events: none; }
+/* Icons are masked, so they take the button's own colour (white on the accent
+   Save button) and swap to the solid cut on hover or keyboard focus. */
+.save-ico {
+  width: 22px; height: 22px; pointer-events: none; display: block;
+  background-color: currentColor;
+  -webkit-mask: url(images/save-outline.svg) center / contain no-repeat;
+  mask: url(images/save-outline.svg) center / contain no-repeat;
+}
+.save-btn:hover .save-ico, .save-btn:focus-visible .save-ico {
+  -webkit-mask-image: url(images/save-solid.svg);
+  mask-image: url(images/save-solid.svg);
+}
 
-/* add buttons — bare add.png icon */
+/* add buttons — bare icon, no chrome */
 .add-icon-btn {
   padding: 4px; background: none; border: none; border-radius: 8px; cursor: pointer;
   line-height: 0; opacity: 0.85; transition: opacity 0.12s ease, background 0.12s ease;
 }
 .add-icon-btn:hover { opacity: 1; background: rgba(0, 0, 0, 0.05); }
 .add-icon-btn img { width: 26px; height: 26px; display: block; pointer-events: none; }
+.add-ico {
+  width: 26px; height: 26px; display: block; pointer-events: none;
+  background-color: currentColor;
+  -webkit-mask: url(images/add-outline.svg) center / contain no-repeat;
+  mask: url(images/add-outline.svg) center / contain no-repeat;
+}
+.add-icon-btn:hover .add-ico, .add-icon-btn:focus-visible .add-ico {
+  -webkit-mask-image: url(images/add-solid.svg);
+  mask-image: url(images/add-solid.svg);
+}
 
 .activity-row .edit-name {
   flex: 1;

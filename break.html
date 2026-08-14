@@ -12,6 +12,28 @@
     <p id="timeline"><span id="time-left">00:00</span> left in your <span id="break-len">break</span></p>
     <div id="progress"><span id="progress-fill"></span></div>
 
+    <!-- The urge wave keeps going through the break: same entry, same curve. -->
+    <div id="urge-wave" class="hidden">
+      <p id="uw-prompt">How strong is the urge now? Tap a number to add a point.</p>
+      <div id="uw-row">
+        <div id="uw-lvls">
+          <button class="uw-lvl" type="button" data-v="10">10</button>
+          <button class="uw-lvl" type="button" data-v="8">8</button>
+          <button class="uw-lvl" type="button" data-v="6">6</button>
+          <button class="uw-lvl" type="button" data-v="4">4</button>
+          <button class="uw-lvl" type="button" data-v="2">2</button>
+          <button class="uw-lvl" type="button" data-v="0">0</button>
+        </div>
+        <svg id="uw-chart" viewBox="0 0 400 140">
+          <defs><linearGradient id="uw-grad" gradientUnits="userSpaceOnUse" x1="0" y1="6" x2="0" y2="134"><stop offset="0" stop-color="#1d4f86"/><stop offset="1" stop-color="#9cc7ee"/></linearGradient></defs>
+          <g id="uw-grid"></g>
+          <line id="uw-now" x1="10" y1="6" x2="10" y2="134"/>
+          <path id="uw-path"/>
+          <g id="uw-dots"></g>
+        </svg>
+      </div>
+    </div>
+
     <div id="rating">
       <p id="rating-prompt">Did this give you what you came for?</p>
       <div id="rating-opts">
@@ -40,6 +62,7 @@
     </div>
   </main>
   <script src="breaks-common.js"></script>
+  <script src="reflections-common.js"></script>
   <script src="break.js"></script>
 </body>
 </html>

@@ -93,41 +93,192 @@ body.compose-light #compose {
 
 #compose-close {
   position: absolute; top: 10px; right: 12px; z-index: 5;   /* always on top, in clear space */
-  width: 32px; height: 32px; border-radius: 50%;
-  border: none; background: rgba(128, 128, 128, 0.25); color: inherit;
-  font-size: 18px; line-height: 1; cursor: pointer;
+  width: 30px; height: 30px; padding: 0;
+  border: none; background: none; color: inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: 0.6;
+}
+#compose-close:hover { opacity: 1; }
+#compose-close svg { width: 24px; height: 24px; fill: currentColor; }
+.ic-solid { display: none; }
+#compose-close:hover .ic-solid, #compose-close:focus-visible .ic-solid { display: block; }
+#compose-close:hover .ic-rr,    #compose-close:focus-visible .ic-rr    { display: none; }
+
+.body-tag.dragging { opacity: 0.45; }
+.drag-grip { cursor: grab; opacity: 0.4; font-size: 13px; line-height: 1; user-select: none; }
+
+/* ---- urge window (the compose card is an urge-surfing window) ---- */
+#urge-head { display: flex; align-items: center; gap: 10px; padding-right: 40px; text-align: left; }
+#urge-mark { width: 22px; height: 22px; fill: #7fb1e8; flex: 0 0 auto; }
+#urge-title { font-size: 20px; font-weight: 700; flex: 1 1 auto; }
+#urge-timer { font-size: 15px; opacity: 0.65; font-variant-numeric: tabular-nums; }
+#urge-timer:empty { display: none; }
+
+#urge-statement {
+  text-align: left; font-size: 17px; line-height: 1.5;
+  border: 1px solid rgba(128,128,128,0.45); border-radius: 12px; padding: 12px 14px;
+}
+#urge-decision { margin: -8px 0 0; text-align: left; font-size: 14px; opacity: 0.65; }
+
+#urge-segrow { position: relative; display: flex; align-items: center; gap: 10px; }
+#urge-info {
+  width: 26px; height: 26px; padding: 0; flex: 0 0 auto;
+  border: none; background: none; color: inherit; cursor: pointer; opacity: 0.5;
   display: flex; align-items: center; justify-content: center;
 }
+#urge-info:hover, #urge-info:focus-visible { opacity: 1; }
+#urge-info svg { width: 20px; height: 20px; fill: currentColor; }
+#urge-info:hover .ic-solid, #urge-info:focus-visible .ic-solid { display: block; }
+#urge-info:hover .ic-rr,    #urge-info:focus-visible .ic-rr    { display: none; }
+/* the view's introduction, kept out of the way until you ask for it */
+#urge-info-pop {
+  position: absolute; z-index: 6; top: calc(100% + 8px); left: 0; right: 0;
+  padding: 11px 13px; border-radius: 10px; font-size: 14px; line-height: 1.5;
+  background: rgba(12, 12, 20, 0.97); color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.16); box-shadow: 0 10px 28px rgba(0,0,0,0.45);
+}
+body.compose-light #urge-info-pop {
+  background: #fff; color: #111; border-color: rgba(0,0,0,0.12); box-shadow: 0 10px 28px rgba(0,0,0,0.18);
+}
+#urge-info-pop[hidden] { display: none; }
 
-.field { text-align: left; }
-/* keep the top field clear of the × close button so its lower-left stays clickable */
-.field-thoughts { padding-right: 34px; }
-.field > label {
-  display: block; font-size: 17px; font-weight: 700; letter-spacing: 0.08em;
-  text-transform: uppercase; opacity: 0.55; margin-bottom: 9px;
+#urge-segbar {
+  display: flex; gap: 2px; align-self: flex-start;
+  border: 1px solid rgba(128,128,128,0.4); border-radius: 999px; padding: 3px;
+}
+.urge-seg {
+  display: flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: 999px; border: none; cursor: pointer;
+  background: transparent; color: inherit; opacity: 0.7; font-family: inherit; font-size: 15px;
+}
+.urge-seg svg { width: 17px; height: 17px; fill: currentColor; }
+.urge-seg .ic-solid { display: none; }
+.urge-seg.on { background: #6aa3ff; color: #fff; opacity: 1; font-weight: 600; }
+.urge-seg.on .ic-solid { display: block; }
+.urge-seg.on .ic-rr { display: none; }
+body.compose-light .urge-seg.on { background: #4a86e8; }
+
+/* All four panels share one grid cell, so the window is always as tall as the
+   tallest (the rabbit) and nothing jumps when you switch tabs. The shorter views
+   simply leave blank space above the exit buttons. */
+#urge-panels { display: grid; min-height: 393px; }
+.urge-panel { grid-area: 1 / 1; text-align: left; align-self: start; }
+.urge-panel.off { visibility: hidden; pointer-events: none; }
+
+#wave-prompt { margin: 10px 0 10px; font-size: 15px; color: #8fb8ea; }
+body.compose-light #wave-prompt { color: #2f6cb8; }
+.breath-row { display: flex; align-items: center; gap: 12px; font-size: 14px; opacity: 0.75; }
+/* The pacer: JS drives the ball through out · hold · in · hold on the chosen pattern.
+   The faint ring marks a full breath, so the ball's size reads at a glance even
+   while a hold keeps it still. */
+.breath-ring {
+  width: 46px; height: 46px; border-radius: 50%; flex: 0 0 auto;
+  border: 1.5px solid rgba(156, 199, 238, 0.45);
+  display: flex; align-items: center; justify-content: center;
+}
+.breath-ball {
+  width: 40px; height: 40px; border-radius: 50%; background: #9cc7ee;
+  transform: scale(1);
 }
 
-#thought-input {
-  width: 100%; font-family: inherit; font-size: 18px; padding: 13px 15px;
-  border-radius: 10px; border: 1px solid rgba(128,128,128,0.4);
-  background: rgba(128,128,128,0.12); color: inherit; cursor: none;
+#breath-modes { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.breath-mode {
+  font-family: inherit; font-size: 13px; padding: 5px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid rgba(128,128,128,0.5); background: transparent; color: inherit; opacity: 0.75;
 }
-#thought-input::placeholder { color: inherit; opacity: 0.4; }
+.breath-mode.on { border-color: #6aa3ff; background: rgba(106,163,255,0.18); color: #9cc4ff; opacity: 1; }
+body.compose-light .breath-mode.on { background: rgba(74,134,232,0.12); color: #2f5fb3; }
 
-#thought-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-#thought-chips:empty { display: none; }
+#wave-chart-row { display: flex; gap: 10px; }
+#wave-lvls { display: flex; flex-direction: column; justify-content: space-between; padding: 2px 0; }
+.wave-lvl {
+  width: 34px; height: 34px; border-radius: 50%;
+  border: 1px solid rgba(128,128,128,0.5); background: rgba(128,128,128,0.12);
+  color: inherit; font-family: inherit; font-size: 13px; cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+.wave-lvl:hover { border-color: #6aa3ff; color: #6aa3ff; }
+#wave-chart { flex: 1 1 auto; min-width: 0; height: 232px; background: rgba(128,128,128,0.1); border-radius: 10px; }
+#wave-now { stroke: rgba(128,128,128,0.8); stroke-width: 1; stroke-dasharray: 3 4; }
+#wave-path { fill: none; stroke: url(#wave-grad); stroke-width: 2.5; stroke-linecap: round; }
+.wgrid { stroke: rgba(128,128,128,0.25); stroke-width: 0.75; }
 
-.thought-chip {
-  display: inline-flex; align-items: center; gap: 6px;
-  font-size: 17px; padding: 7px 9px 7px 13px; border-radius: 999px;
-  background: rgba(128,128,128,0.2);
+#tho-hint { margin: 0 0 10px; font-size: 16px; opacity: 0.6; }   /* matches the Body view's line */
+/* You are the sky; the thoughts are clouds passing through it. They drift at
+   their own slow pace, turn back at the edges, and hold still while you reach
+   for one. Keeping a thought catches the sun. */
+#tho-sky {
+  position: relative; overflow: hidden;
+  height: 232px; margin-bottom: 12px; border-radius: 16px;
+  background: linear-gradient(180deg, #bfe0f7 0%, #dcefff 62%, #eef7ff 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.6);
 }
-.thought-chip.dragging, .body-tag.dragging { opacity: 0.45; }
-.drag-grip { cursor: grab; opacity: 0.4; font-size: 13px; line-height: 1; user-select: none; }
-.thought-chip .x {
-  font-size: 13px; line-height: 1; padding: 2px 6px; border-radius: 999px;
-  border: none; background: rgba(0,0,0,0.18); color: inherit; cursor: none;
+#tho-clouds { position: absolute; inset: 0; }
+#tho-empty {
+  position: absolute; inset: 0; margin: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; color: #5d82a6; pointer-events: none;
 }
+#tho-empty.hidden { display: none; }
+
+.cloud {
+  --cloud-bg: #fff;
+  position: absolute; top: 0; left: 0; will-change: transform;
+  display: flex; align-items: center; gap: 8px;
+  padding: 11px 22px; border: none; background: none; color: #1d3550;   /* clears the round ends */
+  font-family: inherit; font-size: 15px; line-height: 1.2; cursor: pointer;
+  filter: drop-shadow(0 3px 7px rgba(42, 84, 130, 0.22));   /* one shadow for the whole silhouette */
+  max-width: calc(100% - 20px);
+}
+.cloud-text { position: relative; z-index: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* the drawn cloud sits behind the words and reaches above them for the lobes */
+.cloud-shape {
+  position: absolute; left: 0; top: calc(-1 * var(--rise, 16px));
+  width: 100%; height: calc(100% + var(--rise, 16px));
+  overflow: visible; pointer-events: none;
+}
+.cloud-shape path { fill: var(--cloud-bg); }
+.cloud.on {                                  /* kept for this session: the sun catches it */
+  --cloud-bg: #ffd98a;
+  color: #6b4708;
+  filter: drop-shadow(0 3px 10px rgba(214, 148, 20, 0.45));
+}
+.cloud.editing { --cloud-bg: #fff; }
+.cloud .ed { display: none; align-items: center; gap: 6px; position: relative; z-index: 1; }
+.cloud.editing .ed { display: inline-flex; }
+.cloud .ed button { border: none; background: none; padding: 2px; cursor: pointer; line-height: 0; }
+.cloud .ed svg { width: 15px; height: 15px; }
+.cloud input {
+  position: relative; z-index: 1;
+  font-family: inherit; font-size: 15px; border: none; background: transparent;
+  color: inherit; outline: none; width: 14ch;
+}
+
+#tho-add-row { display: flex; gap: 8px; }
+#tho-input {
+  flex: 1 1 auto; font-family: inherit; font-size: 16px; padding: 10px 13px;
+  border-radius: 999px; border: 1px solid rgba(128,128,128,0.4);
+  background: rgba(128,128,128,0.12); color: inherit;
+}
+#tho-input::placeholder { color: inherit; opacity: 0.4; }
+#tho-add {
+  width: 42px; padding: 0; border: none; background: none; color: inherit; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: 0.65;
+}
+#tho-add:hover, #tho-add:focus-visible { opacity: 1; }
+#tho-add svg { width: 26px; height: 26px; fill: currentColor; }
+#tho-add:hover .ic-solid, #tho-add:focus-visible .ic-solid { display: block; }
+#tho-add:hover .ic-rr,    #tho-add:focus-visible .ic-rr    { display: none; }
+
+#urge-exits { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.urge-exit {
+  padding: 12px 16px; border-radius: 999px; font-family: inherit; font-size: 15px; cursor: pointer;
+  border: 1px solid rgba(128,128,128,0.5); background: rgba(128,128,128,0.12); color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.urge-exit:disabled { opacity: 0.5; cursor: default; }
+.urge-exit.primary { background: #6aa3ff; border-color: #6aa3ff; color: #fff; }
+.urge-exit.primary:hover { background: #5b96f5; }
+.urge-exit.hidden { display: none; }
 
 /* body map — hover the rabbit; glowing dots reveal labels; tap to tag where you feel something */
 .bodymap { display: flex; gap: 16px; align-items: flex-start; }
@@ -223,7 +374,7 @@ body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,6
 /* quadrant cells, flush together; tags sit centred in a box in the middle of each quadrant,
    inset from the central axis and the edge icons */
 .cx-cell {
-  min-height: 200px; padding: 28px 36px;
+  min-height: 176px; padding: 20px 30px;   /* two rows stay inside the rabbit's height */
   display: flex; flex-wrap: wrap; gap: 8px 10px; cursor: pointer;
   align-content: center; justify-content: center; align-items: center;
 }
@@ -234,7 +385,7 @@ body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,6
 
 /* pills carry their quadrant's colour on the border and text (set per quadrant from JS) */
 .cx-chip {
-  font-family: inherit; font-size: 16px; padding: 7px 14px; border-radius: 999px;
+  font-family: inherit; font-size: 15px; padding: 4px 12px; border-radius: 999px;
   background: #fff; border: 1.5px solid; cursor: pointer; font-weight: 600;
 }
 .cx-chip.on { color: #fff !important; }
@@ -296,8 +447,7 @@ body.starmap-light #celebrate-name { color: #9a5e00; }
 #compose { cursor: default; }
 #compose input { cursor: text; }
 #compose button,
-#compose .cx-chip,
-#compose .thought-chip .x { cursor: pointer; }
+#compose .cx-chip { cursor: pointer; }
 
 #wand {
   position: fixed; top: 0; left: 0; z-index: 9999; pointer-events: none;
@@ -335,89 +485,3 @@ body.reduce-motion .summon-star { animation: summon-pop 0.4s cubic-bezier(0.2, 1
 }
 
 /* The front door: a dark card floating over the sky, after the compose. */
-#rank {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.6);
-}
-
-#rank.hidden { display: none; }
-
-#rank-card {
-  width: min(560px, 92vw);
-  max-height: 90vh;
-  overflow-y: auto;
-  background: #101820;
-  color: #f2f2f2;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  border-radius: 16px;
-  padding: 22px 24px 24px;
-}
-
-#rank-title { margin: 0; font-size: 22px; }
-#rank-sub { margin: 4px 0 14px; font-size: 13px; opacity: 0.65; }
-
-#rank-state {
-  border: 2px solid #f2f2f2;
-  border-radius: 14px;
-  padding: 12px 14px;
-  text-align: center;
-  margin-bottom: 12px;
-}
-
-#rank-label { margin: 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.6; }
-#rank-key { margin: 6px 0 0; font-size: 18px; font-weight: 700; }
-#rank-goal-echo { margin: 4px 0 0; font-size: 13px; opacity: 0.75; }
-#rank-goal-echo:empty { display: none; }
-
-#rank-pills { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-
-.rank-pill {
-  font-family: inherit;
-  font-size: 13px;
-  padding: 8px 14px;
-  border-radius: 999px;
-  border: 1px solid #f2f2f2;
-  background: transparent;
-  color: #f2f2f2;
-  cursor: pointer;
-}
-
-.rank-pill.on { background: #f2f2f2; color: #101820; }
-
-#rank-new, #rank-goal {
-  width: 100%;
-  box-sizing: border-box;
-  font-family: inherit;
-  font-size: 14px;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(255, 255, 255, 0.5);
-  background: transparent;
-  color: #f2f2f2;
-  margin-bottom: 4px;
-}
-
-#rank-new::placeholder, #rank-goal::placeholder { color: #f2f2f2; opacity: 0.4; }
-
-#rank-goal-label { margin: 10px 0 6px; font-size: 13px; font-weight: 600; }
-
-#rank-doors { display: flex; flex-direction: column; gap: 8px; margin-top: 16px; }
-
-#rank-doors button {
-  font-family: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 12px;
-  border-radius: 10px;
-  border: none;
-  background: rgba(255, 255, 255, 0.14);
-  color: #f2f2f2;
-  cursor: pointer;
-}
-
-#rank-doors button:disabled { opacity: 0.4; cursor: default; }

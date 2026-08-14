@@ -63,6 +63,15 @@ async function saveReduceMotion(on) {
   await chrome.storage.sync.set({ reflectReduceMotion: !!on });
 }
 
+// The breathing pattern the wave pacer follows; remembered between sessions.
+async function loadBreathPattern() {
+  const { reflectBreathPattern } = await chrome.storage.sync.get("reflectBreathPattern");
+  return reflectBreathPattern || "box";
+}
+async function saveBreathPattern(id) {
+  await chrome.storage.sync.set({ reflectBreathPattern: id || "box" });
+}
+
 // User-defined star-map background colour (the reflection screen adapts its ink to it).
 async function loadStarmapBg() {
   const { reflectStarmapBg } = await chrome.storage.sync.get("reflectStarmapBg");
@@ -83,9 +92,16 @@ function reflectionStarText(entry) {
   const moods = Array.isArray(entry.mood) ? entry.mood.filter(Boolean) : (entry.mood ? [entry.mood] : []);
   if (moods.length) return moods.join(" · ");
   const bodyItems = Array.isArray(entry.body) ? entry.body : (entry.body ? [{ part: "", note: entry.body }] : []);
-  return bodyItems
+  const bodyText = bodyItems
     .map((b) => (b.part ? (b.note ? b.part + ": " + b.note : b.part) : (b.note || "")))
     .filter(Boolean).join(" · ");
+  if (bodyText) return bodyText;
+  const wave = Array.isArray(entry.wave) ? entry.wave : [];
+  if (wave.length) {                     // a wave-only session still lights its star
+    const peak = Math.max(...wave.map((p) => p.v || 0));
+    return "rode an urge wave · peak " + peak + "/10 · " + wave.length + (wave.length === 1 ? " point" : " points");
+  }
+  return "";
 }
 
 // Each reflection is ONE star within the window.

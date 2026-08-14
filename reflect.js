@@ -9,15 +9,33 @@ const composeOverlay = document.getElementById("compose-overlay");
 const composeClose = document.getElementById("compose-close");
 const wandEl = document.getElementById("wand");
 const twinkleEl = document.getElementById("twinkle");
-const thoughtInput = document.getElementById("thought-input");
-const thoughtChips = document.getElementById("thought-chips");
 const bodyFig = document.getElementById("body-fig");
 const bodyDots = document.getElementById("body-dots");
 const bodyTagsEl = document.getElementById("body-tags");
 const bodyHint = document.getElementById("body-hint");
 const circumplexEl = document.getElementById("circumplex");
-const saveBtn = document.getElementById("save-btn");
 const continueBtn = document.getElementById("continue-btn");
+const urgeTimerEl = document.getElementById("urge-timer");
+const urgeSiteEl = document.getElementById("urge-site");
+const urgeStatementEl = document.getElementById("urge-statement");
+const urgeDecisionEl = document.getElementById("urge-decision");
+const urgeSegbar = document.getElementById("urge-segbar");
+const thoSkyEl = document.getElementById("tho-sky");
+const thoCloudsEl = document.getElementById("tho-clouds");
+const thoEmptyEl = document.getElementById("tho-empty");
+const thoInput = document.getElementById("tho-input");
+const thoAddBtn = document.getElementById("tho-add");
+const openBtn = document.getElementById("open-btn");
+const relaxBtn = document.getElementById("relax-btn");
+const mattersBtn = document.getElementById("matters-btn");
+const breathBalls = document.querySelectorAll(".breath-ball");   // the Wave and Thoughts views share one pacer
+const breathModesEl = document.getElementById("breath-modes");
+const urgeInfoBtn = document.getElementById("urge-info");
+const urgeInfoPop = document.getElementById("urge-info-pop");
+const waveGrid = document.getElementById("wave-grid");
+const waveNow = document.getElementById("wave-now");
+const wavePath = document.getElementById("wave-path");
+const waveDots = document.getElementById("wave-dots");
 const winToggle = document.getElementById("window-toggle");
 const bottomEl = document.getElementById("bottom");
 const composeEl = document.getElementById("compose");
@@ -27,9 +45,9 @@ const celebrateMsg = document.getElementById("celebrate-msg");
 const celebrateName = document.getElementById("celebrate-name");
 const celebrateContinue = document.getElementById("celebrate-continue");
 
-// The merged pause countdown greys both buttons until it finishes.
+// The merged pause countdown greys the sky Continue and the unlock exit until it finishes.
 continueBtn.disabled = true;
-saveBtn.disabled = true;
+openBtn.disabled = true;
 
 const WAND_SMALL = 120;             // resting size on the star map (uses images/wand-120.png)
 const WAND_LARGE = 250;             // when you shake to summon a star (uses images/wand.png)
@@ -62,7 +80,7 @@ const SENSE_PARTS = ["see", "smell", "taste", "head area", "listen", "touch"];
 const NEAR_FRAC = 0.34;             // how close (× figure width) the cursor must be to light a dot
 // ==============================================================
 
-let thoughts = [];
+let thoughts = [];          // this session's thoughts = the toggled-on pills, kept in sync by syncThoughts()
 let bodyTags = [];          // [{ part, note }] — body-map tags, up to BODY_MAX
 const BODY_MAX = 3;
 let bodyDotEls = [];
@@ -465,30 +483,464 @@ function makeReorderable(handle, target, list, index, rerender) {
   });
 }
 
-function renderThoughtChips() {
-  thoughtChips.innerHTML = "";
-  thoughts.forEach((t, i) => {
-    const chip = document.createElement("span");
-    chip.className = "thought-chip";
-    const grip = document.createElement("span");
-    grip.className = "drag-grip"; grip.textContent = "⠿"; grip.title = "Drag to reorder";
-    chip.appendChild(grip);
-    chip.append(document.createTextNode(t));
-    const x = document.createElement("button");
-    x.className = "x"; x.type = "button"; x.textContent = "×";
-    x.addEventListener("click", () => { thoughts.splice(i, 1); renderThoughtChips(); });
-    chip.appendChild(x);
-    makeReorderable(grip, chip, thoughts, i, renderThoughtChips);   // drag the grip to reorder
-    thoughtChips.appendChild(chip);
-  });
-  refreshSaveLabel();
+// ---------- thoughts as pills: the three most frequent across sessions, plus this session's own ----------
+// One tap toggles a pill into this session's log; a double tap opens edit mode
+// (blue pencil to rename, red trash to delete); a click anywhere else leaves it.
+let thoughtStats = {};      // { text: { n, last } } — persisted in chrome.storage.local
+let pillItems = [];         // [{ text, selected, custom, editing, renaming }]
+let lastPillTap = { item: null, ts: 0 };   // survives re-renders, so double-tap works on the rebuilt pill
+const PILL_CLICK_MS = 260;  // how quickly a second tap counts as a double tap
+
+const PILL_EDIT_SVG = '<svg viewBox="0 0 24 24" style="fill:#5b96f5" aria-hidden="true"><path d="M22.987,5.451c-.028-.177-.312-1.767-1.464-2.928-1.157-1.132-2.753-1.412-2.931-1.44-.237-.039-.479,.011-.682,.137-.118,.073-2.954,1.849-8.712,7.566C3.135,14.807,1.545,17.213,1.48,17.312c-.091,.14-.146,.301-.159,.467l-.319,4.071c-.022,.292,.083,.578,.29,.785,.188,.188,.443,.293,.708,.293,.025,0,.051,0,.077-.003l4.101-.316c.165-.013,.324-.066,.463-.155,.1-.064,2.523-1.643,8.585-7.662,5.759-5.718,7.548-8.535,7.622-8.652,.128-.205,.178-.45,.14-.689Zm-9.17,7.922c-4.93,4.895-7.394,6.78-8.064,7.263l-2.665,.206,.206-2.632c.492-.672,2.393-3.119,7.312-8.004,1.523-1.512,2.836-2.741,3.942-3.729,.01,.002,.02,.004,.031,.006,.012,.002,1.237,.214,2.021,.98,.772,.755,.989,1.93,.995,1.959,0,.004,.002,.007,.002,.011-.999,1.103-2.245,2.416-3.78,3.94Zm5.309-5.684c-.239-.534-.597-1.138-1.127-1.656-.524-.513-1.134-.861-1.674-1.093,1.139-.95,1.908-1.516,2.309-1.797,.419,.124,1.049,.377,1.481,.8,.453,.456,.695,1.081,.81,1.469-.285,.4-.851,1.159-1.798,2.278Z"/></svg>';
+const PILL_TRASH_SVG = '<svg viewBox="0 0 24 24" style="fill:#e05555" aria-hidden="true"><path d="M21,4H17.9A5.009,5.009,0,0,0,13,0H11A5.009,5.009,0,0,0,6.1,4H3A1,1,0,0,0,3,6H4V19a5.006,5.006,0,0,0,5,5h6a5.006,5.006,0,0,0,5-5V6h1a1,1,0,0,0,0-2ZM11,2h2a3.006,3.006,0,0,1,2.829,2H8.171A3.006,3.006,0,0,1,11,2Zm7,17a3,3,0,0,1-3,3H9a3,3,0,0,1-3-3V6H18Z"/><path d="M10,18a1,1,0,0,0,1-1V11a1,1,0,0,0-2,0v6A1,1,0,0,0,10,18Z"/><path d="M14,18a1,1,0,0,0,1-1V11a1,1,0,0,0-2,0v6A1,1,0,0,0,14,18Z"/></svg>';
+
+async function loadThoughtStats() {
+  try {
+    const { thoughtStats: t } = await chrome.storage.local.get("thoughtStats");
+    return t && typeof t === "object" ? t : {};
+  } catch (e) { return {}; }
 }
-thoughtInput.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    const v = thoughtInput.value.trim();
-    if (v) { thoughts.push(v); thoughtInput.value = ""; renderThoughtChips(); }
+async function saveThoughtStats() {
+  try { await chrome.storage.local.set({ thoughtStats }); } catch (e) {}
+}
+function topThoughts(k) {
+  return Object.entries(thoughtStats)
+    .sort((a, b) => (b[1].n - a[1].n) || (b[1].last - a[1].last))
+    .slice(0, k).map(([text]) => text);
+}
+function initPills() {
+  pillItems = topThoughts(3).map((text) => ({ text, selected: false, custom: false }));
+  renderPills();
+}
+function syncThoughts() { thoughts = pillItems.filter((p) => p.selected).map((p) => p.text); }
+
+// Each thought is a cloud: a white pill whose bumps ride on top, drifting at its
+// own slow pace and turning back at the edges. Hovering the sky holds them still
+// so a cloud is never a moving target. Keeping one catches the sun.
+const CLOUD_ROWS = [0.13, 0.35, 0.56, 0.76];   // clear of the top edge, so the bumps are never clipped
+const CLOUD_SPEED_MIN = 3, CLOUD_SPEED_MAX = 9;   // px per second: slow enough to feel like weather
+let cloudRaf = 0;
+let cloudLast = 0;
+let skyHovered = false;
+
+function seededRand(text) {                       // stable per thought, so a cloud keeps its shape
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) { h ^= text.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return () => { h = Math.imul(h ^ (h >>> 15), 2246822507); h ^= h >>> 13; return ((h >>> 0) % 1000) / 1000; };
+}
+
+// Each cloud is one drawn path in the style of cloud-01: a flat bottom, uneven
+// lobes rising about a third of the height, the tallest just left of centre.
+// The lobes are arcs that meet at cusps, so there is never a straight top edge,
+// and the path is generated at the pill's real width so nothing is stretched.
+const CLOUD_LOBES = [0.17, 0.27, 0.21, 0.19, 0.16];   // cloud-01's proportions, left to right
+
+function buildShape(el, text) {
+  const W = el.offsetWidth, band = el.offsetHeight;   // band = the text row
+  if (!W || !band) return;                            // the window is still closed
+  if (el.__shapeW === W) return;                      // already drawn at this width
+  el.__shapeW = W;
+
+  const rise = Math.round(band * 0.5);                // low and wide
+  const H = band + rise;
+  const r = band / 2;                                 // the text band is a stadium: fully round ends
+  const wTop = Math.max(6, W - 2 * r);                // the top run the lobes have to cover
+  const rnd = seededRand(text);
+  const n = Math.max(2, Math.min(7, Math.round(wTop / (band * 1.1))));
+
+  const ws = [];
+  for (let i = 0; i < n; i++) {
+    const b = CLOUD_LOBES[Math.round((i / Math.max(1, n - 1)) * (CLOUD_LOBES.length - 1))];
+    ws.push(b * (0.85 + 0.3 * rnd()));                // uneven, but stable per thought
   }
+  const total = ws.reduce((a, b) => a + b, 0);
+  const widest = Math.max(...ws);
+
+  // Drawn clockwise: up the round left end, over the lobes, down the round right
+  // end, then the flat bottom closes it. The band is a stadium, never a rectangle.
+  let x = r;
+  let d = "M" + r.toFixed(1) + "," + H +
+          " A" + r.toFixed(1) + "," + r.toFixed(1) + " 0 0 1 " + r.toFixed(1) + "," + rise;
+  for (let i = 0; i < n; i++) {
+    const c = (ws[i] / total) * wTop;                 // this lobe's chord
+    // Heights follow a rough trend: lower at the two edges, fuller toward the
+    // middle, peaking a little left of centre. The jitter keeps it from reading
+    // as a tidy arch.
+    const t = Math.pow((i + 0.5) / n, 0.8);           // the exponent shifts the peak left
+    const arch = 0.34 + 0.66 * Math.sin(Math.PI * t);
+    const vary = 0.84 + 0.32 * rnd();
+    const h = Math.min(c / 2, rise * Math.max(0.3, Math.min(1, arch * vary * (0.75 + 0.25 * (ws[i] / widest)))));
+    const lr = (h * h + (c / 2) * (c / 2)) / (2 * h); // circle through both ends, h tall
+    x += c;
+    d += " A" + lr.toFixed(1) + "," + lr.toFixed(1) + " 0 0 1 " + x.toFixed(1) + "," + rise;
+  }
+  d += " A" + r.toFixed(1) + "," + r.toFixed(1) + " 0 0 1 " + (W - r).toFixed(1) + "," + H + " Z";
+
+  let svg = el.querySelector(".cloud-shape");
+  if (!svg) {
+    svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "cloud-shape");
+    svg.setAttribute("aria-hidden", "true");
+    svg.appendChild(document.createElementNS("http://www.w3.org/2000/svg", "path"));
+    el.insertBefore(svg, el.firstChild);
+  }
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  svg.style.setProperty("--rise", rise + "px");
+  svg.firstChild.setAttribute("d", d);
+}
+
+function renderPills() {
+  thoCloudsEl.innerHTML = "";
+  thoEmptyEl.classList.toggle("hidden", pillItems.length > 0);
+  pillItems.forEach((item, idx) => {
+    const cloud = document.createElement("button");
+    cloud.type = "button";
+    cloud.className = "cloud" + (item.selected ? " on" : "") + (item.editing ? " editing" : "");
+    if (item.renaming) {
+      const inp = document.createElement("input");
+      inp.type = "text"; inp.value = item.text;
+      let done = false;
+      const commit = () => {
+        if (done) return; done = true;
+        const v = inp.value.trim();
+        if (v && v !== item.text) {
+          if (thoughtStats[item.text]) {
+            const from = thoughtStats[item.text], into = thoughtStats[v];
+            // renaming onto an existing thought merges the counts instead of overwriting them
+            thoughtStats[v] = into
+              ? { n: into.n + from.n, last: Math.max(into.last, from.last) }
+              : from;
+            delete thoughtStats[item.text];
+            saveThoughtStats();
+          }
+          const dup = pillItems.find((p) => p !== item && p.text === v);
+          if (dup) {                                                 // collapse duplicate clouds
+            item.selected = item.selected || dup.selected;           // keep the selection, like the counts
+            pillItems = pillItems.filter((p) => p !== dup);
+          }
+          item.text = v;
+        }
+        item.renaming = false; item.editing = false;
+        syncThoughts(); renderPills();
+      };
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") { e.preventDefault(); commit(); }
+        else if (e.key === "Escape") { done = true; item.renaming = false; item.editing = false; renderPills(); }
+      });
+      inp.addEventListener("blur", commit);
+      inp.addEventListener("click", (e) => e.stopPropagation());
+      cloud.appendChild(inp);
+      placeCloud(cloud, item, idx);
+      thoCloudsEl.appendChild(cloud);
+      requestAnimationFrame(() => inp.focus());
+      return;
+    }
+    const label = document.createElement("span");
+    label.className = "cloud-text";
+    label.textContent = item.text;
+    cloud.appendChild(label);
+    const ed = document.createElement("span");
+    ed.className = "ed";
+    const editBtn = document.createElement("button");
+    editBtn.type = "button"; editBtn.title = "Edit"; editBtn.innerHTML = PILL_EDIT_SVG;
+    editBtn.addEventListener("click", (e) => { e.stopPropagation(); item.renaming = true; renderPills(); });
+    const delBtn = document.createElement("button");
+    delBtn.type = "button"; delBtn.title = "Delete"; delBtn.innerHTML = PILL_TRASH_SVG;
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pillItems = pillItems.filter((p) => p !== item);
+      if (thoughtStats[item.text]) { delete thoughtStats[item.text]; saveThoughtStats(); }
+      syncThoughts(); renderPills();
+    });
+    ed.appendChild(editBtn); ed.appendChild(delBtn);
+    cloud.appendChild(ed);
+    cloud.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // A tap on any cloud also closes edit mode on the others (the document
+      // listener never sees these clicks, since they stop here).
+      pillItems.forEach((p) => { if (p !== item) { p.editing = false; p.renaming = false; } });
+      if (item.editing) { item.editing = false; renderPills(); return; }   // tapping it again puts the tools away
+      const now = Date.now();
+      const second = lastPillTap.item === item && (now - lastPillTap.ts) < PILL_CLICK_MS;
+      lastPillTap = second ? { item: null, ts: 0 } : { item, ts: now };
+      // The toggle lands immediately, never on a timer: an exit tapped a moment
+      // later always reads the state you can see.
+      item.selected = !item.selected;       // on a second tap this undoes the first
+      if (second) item.editing = true;
+      syncThoughts(); renderPills();
+    });
+    placeCloud(cloud, item, idx);
+    thoCloudsEl.appendChild(cloud);
+  });
+  layoutClouds();
+  syncClouds();
+}
+
+// Position is remembered on the thought itself, so a re-render never teleports a cloud.
+function placeCloud(el, item, idx) {
+  if (item.cy == null) item.cy = CLOUD_ROWS[idx % CLOUD_ROWS.length];
+  if (item.cx == null) item.cx = 0.08 + ((idx * 0.37) % 0.5);
+  if (item.vx == null) {
+    const speed = CLOUD_SPEED_MIN + Math.random() * (CLOUD_SPEED_MAX - CLOUD_SPEED_MIN);
+    item.vx = (idx % 2 ? 1 : -1) * speed;
+  }
+  el.style.top = (item.cy * 100).toFixed(1) + "%";
+  el.__item = item;
+}
+
+// One positioning pass once the clouds are in the DOM and their widths are known,
+// using the same formula the drift loop uses so nothing jumps on the first frame.
+function layoutClouds() {
+  const w = thoSkyEl.clientWidth;
+  for (const el of thoCloudsEl.children) {
+    const item = el.__item;
+    if (!item) continue;
+    buildShape(el, item.text);
+    const span = Math.max(1, w - el.offsetWidth - 16);
+    el.style.transform = "translateX(" + (8 + item.cx * span).toFixed(1) + "px)";
+  }
+}
+
+function driftClouds(now) {
+  cloudRaf = 0;
+  const dt = Math.min(0.05, (now - cloudLast) / 1000);
+  cloudLast = now;
+  const w = thoSkyEl.clientWidth;
+  let moving = false;
+  for (const el of thoCloudsEl.children) {
+    const item = el.__item;
+    if (!item) continue;
+    const cw = el.offsetWidth;
+    const span = Math.max(1, w - cw - 16);
+    // The drift is the whole point here (thoughts pass, you stay), so it keeps
+    // going under reduced motion, just like the breathing pacer.
+    if (!skyHovered && !item.selected && !item.editing && !item.renaming) {
+      item.cx += (item.vx * dt) / span;
+      if (item.cx <= 0) { item.cx = 0; item.vx = Math.abs(item.vx); }        // turn back at the edge
+      if (item.cx >= 1) { item.cx = 1; item.vx = -Math.abs(item.vx); }
+      moving = true;
+    }
+    el.style.transform = "translateX(" + (8 + item.cx * span).toFixed(1) + "px)";
+  }
+  if (thoCloudsEl.children.length) cloudRaf = requestAnimationFrame(driftClouds);
+  else moving = false;
+}
+
+function syncClouds() {
+  const skyOnScreen = composeOverlay.classList.contains("open") && !celebrating &&
+    !!document.querySelector('.urge-panel[data-p="tho"]:not(.off)');
+  if (skyOnScreen) { layoutClouds(); startClouds(); } else stopClouds();
+}
+function startClouds() {
+  if (cloudRaf || !thoCloudsEl.children.length) return;
+  cloudLast = performance.now();
+  cloudRaf = requestAnimationFrame(driftClouds);
+}
+function stopClouds() {
+  if (cloudRaf) { cancelAnimationFrame(cloudRaf); cloudRaf = 0; }
+}
+thoSkyEl.addEventListener("pointerenter", () => { skyHovered = true; });
+thoSkyEl.addEventListener("pointerleave", () => { skyHovered = false; });
+
+document.addEventListener("click", () => {  // a click anywhere else leaves edit mode
+  let any = false;
+  pillItems.forEach((p) => { if (p.editing || p.renaming) { p.editing = false; p.renaming = false; any = true; } });
+  if (any) renderPills();
+});
+function addThought() {
+  const v = thoInput.value.trim();
+  if (!v) return;
+  const existing = pillItems.find((p) => p.text.toLowerCase() === v.toLowerCase());
+  if (existing) existing.selected = true;
+  else pillItems.push({ text: v, selected: true, custom: true });   // a new cloud drifts in
+  thoInput.value = "";
+  syncThoughts(); renderPills();
+}
+thoAddBtn.addEventListener("click", addThought);
+thoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); addThought(); } });
+
+// ---------- time here: a stopwatch in the window's corner, counting up from 00:00 ----------
+// It counts only the time this page is actually in front of you, so stepping away
+// and coming back does not inflate it. The pause countdown lives on the unlock button.
+let dwellMs = 0;
+let dwellLast = Date.now();
+function paintDwell() {
+  const now = Date.now();
+  if (!document.hidden) dwellMs += now - dwellLast;
+  dwellLast = now;
+  const secs = Math.floor(dwellMs / 1000);
+  urgeTimerEl.textContent =
+    String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
+}
+setInterval(paintDwell, 1000);
+
+// ---------- the breathing pacer: the ball leads out · hold · in · hold ----------
+// It opens on the out-breath, so the first thing an urge asks of you is to let go.
+// Choosing a pattern remembers it for next time.
+const BREATH_PATTERNS = [
+  { id: "box",      inhale: 4, holdIn: 4, exhale: 4, holdOut: 4 },
+  { id: "relax",    inhale: 4, holdIn: 7, exhale: 8, holdOut: 0 },
+  { id: "coherent", inhale: 5, holdIn: 0, exhale: 5, holdOut: 0 },
+];
+const BREATH_SMALL = 0.32, BREATH_BIG = 1;   // a wide travel, so the breath is easy to follow
+let breathPattern = BREATH_PATTERNS[0];
+let breathTimer = 0;
+
+function paintBreathModes() {
+  breathModesEl.querySelectorAll(".breath-mode").forEach((b) => {
+    b.classList.toggle("on", b.dataset.p === breathPattern.id);
+  });
+}
+
+function stopBreath() {
+  if (breathTimer) { clearTimeout(breathTimer); breathTimer = 0; }
+}
+
+// The ball only exists on the Wave tab, so it paces only while you can see it.
+// Every time it appears it begins a fresh out-breath, instead of being caught
+// mid-hold from a cycle that has been running unseen since the page loaded.
+function syncBreath() {
+  const ballOnScreen = composeOverlay.classList.contains("open") &&
+    !celebrating &&
+    !!document.querySelector('.urge-panel:not(.off) .breath-ball');
+  if (ballOnScreen) runBreath(); else stopBreath();
+}
+
+function runBreath() {
+  if (breathTimer) { clearTimeout(breathTimer); breathTimer = 0; }
+  const p = breathPattern;
+  const steps = [
+    { d: p.exhale,  to: BREATH_SMALL },     // out
+    { d: p.holdOut, to: BREATH_SMALL },     // hold, empty
+    { d: p.inhale,  to: BREATH_BIG },       // in
+    { d: p.holdIn,  to: BREATH_BIG },       // hold, full
+  ].filter((s) => s.d > 0);
+  if (!steps.length) return;
+  // The pacer keeps tweening even under reduced motion: this movement is the
+  // feature you follow with your breath, not decoration like the trail or sparkles.
+  let i = 0;
+  const step = () => {
+    const s = steps[i % steps.length];
+    i++;
+    breathBalls.forEach((ball) => {
+      // steady, not eased: an ease-in-out start creeps so slowly it reads as frozen
+      ball.style.transition = "transform " + s.d + "s linear, opacity " + s.d + "s linear";
+      ball.style.transform = "scale(" + s.to + ")";
+      ball.style.opacity = s.to === BREATH_BIG ? "1" : "0.5";
+    });
+    breathTimer = setTimeout(step, s.d * 1000);
+  };
+  breathBalls.forEach((ball) => {            // start full, so the first move is the out-breath
+    ball.style.transition = "none";
+    ball.style.transform = "scale(" + BREATH_BIG + ")";
+    ball.style.opacity = "1";
+    void ball.offsetWidth;                   // flush that reset, or the first out-breath snaps
+  });
+  step();
+}
+
+breathModesEl.querySelectorAll(".breath-mode").forEach((b) => {
+  b.addEventListener("click", () => {
+    const next = BREATH_PATTERNS.find((p) => p.id === b.dataset.p);
+    if (!next || next === breathPattern) return;
+    breathPattern = next;
+    paintBreathModes();
+    runBreath();                            // restart on the out-breath in the new timing
+    saveBreathPattern(next.id);
+  });
+});
+
+// ---------- the info icon: each view's introduction, on hover ----------
+const URGE_INFO = {
+  wave: "Tap a number to drop a point at this moment. The curve joins your points, so you can watch the urge rise, crest, and pass. The ball paces your breath: out, hold, in, hold.",
+  body: "Hover the rabbit, then tap a glowing point to mark where you feel the urge, up to three places. The five senses are pink. Add a few words for each if you like.",
+  emo: "Pick up to three feelings. Left to right is unpleasant to pleasant, bottom to top is calm to activated, so where you land says as much as the words.",
+  tho: "Your three most frequent thoughts wait here as pills. Tap one to keep it with this session, double-tap it to edit or delete it, and add a new one below."
+};
+function activeUrgeView() {
+  const on = urgeSegbar.querySelector(".urge-seg.on");
+  return on ? on.dataset.p : "wave";
+}
+function showUrgeInfo() {
+  urgeInfoPop.textContent = URGE_INFO[activeUrgeView()] || "";
+  urgeInfoPop.hidden = false;
+}
+function hideUrgeInfo() { urgeInfoPop.hidden = true; }
+urgeInfoBtn.addEventListener("mouseenter", showUrgeInfo);
+urgeInfoBtn.addEventListener("mouseleave", hideUrgeInfo);
+urgeInfoBtn.addEventListener("focus", showUrgeInfo);
+urgeInfoBtn.addEventListener("blur", hideUrgeInfo);
+urgeInfoBtn.addEventListener("click", (e) => {   // a tap toggles it, for touch and keyboard
+  e.stopPropagation();
+  if (urgeInfoPop.hidden) showUrgeInfo(); else hideUrgeInfo();
+});
+
+// ---------- the wave: tap a level, a point lands at the current moment ----------
+// The first tap anchors the left edge; the axis covers at least a minute and then
+// grows with the session, so the whole wave (pause and break) always fits.
+const WAVE_DOT_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
+const WAVE_X0 = 14, WAVE_X1 = 392, WAVE_Y0 = 222, WAVE_YSPAN = 212;
+const WAVE_MIN_SPAN = 60000;
+let wavePts = [];           // [{ ts, v }] — absolute times, level 0-10 in steps of 2
+
+function waveY(v) { return WAVE_Y0 - (v / 10) * WAVE_YSPAN; }
+function waveX(ts, now) {
+  if (!wavePts.length) return WAVE_X0;
+  const span = Math.max(WAVE_MIN_SPAN, now - wavePts[0].ts);
+  return WAVE_X0 + Math.min(1, (ts - wavePts[0].ts) / span) * (WAVE_X1 - WAVE_X0);
+}
+function renderWave() {
+  const now = Date.now();
+  waveDots.innerHTML = "";
+  for (const p of wavePts) {
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", waveX(p.ts, now).toFixed(1));
+    c.setAttribute("cy", waveY(p.v).toFixed(1));
+    c.setAttribute("r", "4.5");
+    c.setAttribute("fill", WAVE_DOT_COLORS[p.v] || "#6aa3ff");
+    waveDots.appendChild(c);
+  }
+  const nx = waveX(now, now).toFixed(1);
+  waveNow.setAttribute("x1", nx); waveNow.setAttribute("x2", nx);
+  if (wavePts.length < 2) { wavePath.setAttribute("d", ""); return; }
+  const P = wavePts.map((p) => [waveX(p.ts, now), waveY(p.v)]);
+  let d = "M" + P[0][0].toFixed(1) + "," + P[0][1].toFixed(1);
+  for (let i = 0; i < P.length - 1; i++) {   // catmull-rom → cubic bezier, kink-free
+    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
+    d += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + "," + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
+         " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + "," + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
+         " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
+  }
+  wavePath.setAttribute("d", d);
+}
+function initWaveChart() {
+  [0, 2, 4, 6, 8, 10].forEach((v) => {
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", WAVE_X0); l.setAttribute("x2", WAVE_X1);
+    l.setAttribute("y1", waveY(v)); l.setAttribute("y2", waveY(v));
+    l.setAttribute("class", "wgrid");
+    waveGrid.appendChild(l);
+  });
+  document.querySelectorAll(".wave-lvl").forEach((b) => {
+    b.addEventListener("click", () => {
+      wavePts.push({ ts: Date.now(), v: parseInt(b.dataset.v, 10) });
+      renderWave();
+    });
+  });
+  setInterval(() => {                        // the now-line keeps drifting while the window is open
+    if (composeOverlay.classList.contains("open") && wavePts.length) renderWave();
+  }, 1000);
+}
+
+// ---------- segmented control: Wave · Body · Emotions · Thoughts ----------
+urgeSegbar.querySelectorAll(".urge-seg").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    urgeSegbar.querySelectorAll(".urge-seg").forEach((b) => b.classList.toggle("on", b === btn));
+    document.querySelectorAll(".urge-panel").forEach((p) => { p.classList.toggle("off", p.dataset.p !== btn.dataset.p); });
+    syncBreath();                           // pace only while a view with the ball is showing
+    syncClouds();
+    hideUrgeInfo();
+  });
 });
 
 // ---------- body map (hover the rabbit → dots reveal labels; tap to tag, jot words, up to BODY_MAX) ----------
@@ -527,7 +979,6 @@ function renderBodyTags() {
     bodyTagsEl.appendChild(row);
   });
   syncBodyDots();
-  refreshSaveLabel();
 }
 function toggleBodyPart(part) {
   const idx = bodyTags.findIndex((t) => t.part === part);
@@ -665,7 +1116,6 @@ function renderCircumplex() {
       cell.appendChild(chip);
     }
   }
-  refreshSaveLabel();
 }
 function bindCircumplexCells() {
   for (const q of QUADRANTS) {
@@ -705,7 +1155,10 @@ function addFeelingInline(cell, q) {
 }
 
 function resetFields() {
-  thoughts = []; renderThoughtChips();
+  thoughts = [];
+  pillItems.forEach((p) => { p.selected = false; p.editing = false; p.renaming = false; });
+  renderPills();
+  wavePts = []; renderWave();
   bodyTags = []; renderBodyTags();
   selectedMoods = [];
   renderCircumplex();
@@ -714,125 +1167,94 @@ function openCompose() {
   composeOverlay.classList.add("open");
   if (bottomEl) bottomEl.classList.add("hide");   // hide the screen's Continue while a star is open
   modalOpen = true; updateWand();
-  thoughtInput.focus();
+  syncBreath();                                   // the breath starts when you can see it
+  syncClouds();
 }
 function closeCompose() {
   composeOverlay.classList.remove("open");
   if (bottomEl) bottomEl.classList.remove("hide");
   modalOpen = false; updateWand();
+  stopBreath();
+  stopClouds();
 }
-// The Save button is themed: it lights a star when there's something to save, and reads
-// "Continue" when the reflection is empty (then it just proceeds, lighting nothing).
 function reflectionHasContent() {
-  return thoughts.length > 0 || bodyTags.length > 0 || selectedMoods.length > 0;
+  return thoughts.length > 0 || bodyTags.length > 0 || selectedMoods.length > 0 || wavePts.length > 0;
 }
-function saveLabel() { return reflectionHasContent() ? "Light this star ✨" : "Continue"; }
-function refreshSaveLabel() { if (pauseDone && !celebrating) saveBtn.textContent = saveLabel(); }
 
-async function saveReflection() {
-  if (!pauseDone || celebrating) return;           // gated by the countdown; ignore double clicks
-  if (targetUrl) { openRank(); return; }           // the unlock flow passes the front door
+// ---------- the three exits (and ✕): save whatever was logged, celebrate, then route ----------
+// "Open it anyway" is gated by the pause countdown; the other two are always one tap away.
+let pendingExit = null;     // "unlock" | "relax" | "matters" | null → routes after the celebration
+let exitSaving = false;
+
+function closeThisTab() {
+  try {
+    chrome.tabs.getCurrent((tab) => {
+      if (tab && tab.id != null) chrome.tabs.remove(tab.id);
+      else location.replace("about:blank");
+    });
+  } catch (e) { location.replace("about:blank"); }
+}
+
+function startSoloBreak() {
+  const mins = 3;                                  // a short standalone cool-down, no unlocking
+  const end = Date.now() + mins * 60 * 1000;
+  location.replace(chrome.runtime.getURL("break.html") +
+    "?group=" + encodeURIComponent(groupId) +
+    "&end=" + end + "&mins=" + mins + "&solo=1");
+}
+
+async function routeExit(intent) {
+  if (intent === "unlock") { await proceed(); return; }
+  if (intent === "relax") { startSoloBreak(); return; }
+  if (intent === "matters") { closeThisTab(); return; }
+  dismissCelebration();                            // no destination → back to the live sky
+}
+
+async function exitWith(intent) {
+  if (celebrating || exitSaving) return;
+  if (intent === "unlock" && !pauseDone) return;   // the countdown gates the unlock door only
+  if (!reflectionHasContent()) {
+    if (intent) { await routeExit(intent); } else { resetFields(); closeCompose(); }
+    return;
+  }
+  exitSaving = true;
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
   const mood = sortedMoods().map((m) => m.name);   // ranked feeling names, up to 3
-  if (!reflectionHasContent()) {
-    resetFields(); closeCompose(); proceed(); return;   // nothing written → behave like Continue
+  let site = "";
+  try { site = new URL(targetUrl).hostname.replace(/^www\./, ""); } catch (e) {}
+  const entry = {
+    id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood,
+    ...(wavePts.length ? { wave: wavePts.slice() } : {}),
+    ...(dwellMs > 1000 ? { dwellMs: Math.round(dwellMs) } : {}),   // how long you stayed with it
+    ...(site ? { urge: site } : {})
+  };
+  for (const t of thoughts) {                      // frequency feeds the top-three pills
+    const s = thoughtStats[t] || { n: 0, last: 0 };
+    s.n += 1; s.last = entry.ts;
+    thoughtStats[t] = s;
   }
-  const entry = { id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood };
+  await saveThoughtStats();
   reflectionLog.unshift(entry);
   await saveReflectionLog(reflectionLog);
   renderStars();                                   // re-place: the new star is now in the sky
-  await clearPauseRemaining();
+  if (intent === "unlock") await clearPauseRemaining();
+  if (intent === "unlock" || intent === "relax") {
+    // the break screen finds this and lets the wave keep going on the same entry
+    try { await chrome.storage.local.set({ activeUrge: { group: groupId, refId: entry.id, ts: entry.ts } }); } catch (e) {}
+  }
+  pendingExit = intent;
+  exitSaving = false;
   celebrate(entry.id);
 }
-saveBtn.addEventListener("click", saveReflection);
 
-// ---- the front door (Android parity): a thought AND the aim it serves ----
-// Both doors light the star; only the chosen one decides where you go next.
-const rankEl = document.getElementById("rank");
-const rankPillsEl = document.getElementById("rank-pills");
-const rankKeyEl = document.getElementById("rank-key");
-const rankGoalEcho = document.getElementById("rank-goal-echo");
-const rankNewEl = document.getElementById("rank-new");
-const rankGoalEl = document.getElementById("rank-goal");
-const rankUnlockBtn = document.getElementById("rank-unlock");
-const rankElseBtn = document.getElementById("rank-else");
-let rankKey = null;
-let rankIsNew = false;
-let rankIntentUnlock = true;
-let rankSaving = false;
-
-function rankReady() { return !!rankKey && rankGoalEl.value.trim().length > 0; }
-
-function refreshRank() {
-  rankKeyEl.textContent = rankKey || "…";
-  rankKeyEl.style.opacity = rankKey ? "1" : "0.4";
-  const g = rankGoalEl.value.trim();
-  rankGoalEcho.textContent = g ? "for: " + g : "";
-  rankUnlockBtn.disabled = !rankReady();
-  rankElseBtn.disabled = !rankReady();
-}
-
-function openRank() {
-  try { rankUnlockBtn.textContent = "I'll unlock " + new URL(targetUrl).hostname.replace(/^www\./, ""); }
-  catch (e) { rankUnlockBtn.textContent = "I'll unlock this site"; }
-  rankPillsEl.innerHTML = "";
-  for (const t of thoughts) {
-    const b = document.createElement("button");
-    b.type = "button";
-    b.className = "rank-pill";
-    b.textContent = t;
-    b.addEventListener("click", () => {
-      rankKey = t; rankIsNew = false; rankNewEl.value = "";
-      rankPillsEl.querySelectorAll(".rank-pill").forEach((p) => p.classList.toggle("on", p === b));
-      refreshRank();
-    });
-    rankPillsEl.appendChild(b);
-  }
-  refreshRank();
-  rankEl.classList.remove("hidden");
-  if (!thoughts.length) rankNewEl.focus();
-}
-
-rankNewEl.addEventListener("input", () => {
-  const v = rankNewEl.value.trim();
-  if (v) {
-    rankKey = v; rankIsNew = true;
-    rankPillsEl.querySelectorAll(".rank-pill").forEach((p) => p.classList.remove("on"));
-  } else if (rankIsNew) {
-    rankKey = null;
-  }
-  refreshRank();
+openBtn.addEventListener("click", () => {
+  if (suppressHoldClick) { suppressHoldClick = false; return; }
+  exitWith("unlock");
 });
-rankGoalEl.addEventListener("input", refreshRank);
-
-async function finishRank(unlock) {
-  if (!rankReady() || rankSaving) return;
-  rankSaving = true;
-  rankIntentUnlock = unlock;
-  const key = rankKey;
-  const goal = rankGoalEl.value.trim();
-  if (rankIsNew && !thoughts.includes(key)) thoughts.push(key);
-  const body = bodyTags
-    .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
-    .filter((t) => t.part);
-  const mood = sortedMoods().map((m) => m.name);
-  const entry = {
-    id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood,
-    keyThought: key + " · " + goal
-  };
-  reflectionLog.unshift(entry);
-  await saveReflectionLog(reflectionLog);
-  renderStars();
-  await clearPauseRemaining();
-  rankEl.classList.add("hidden");
-  rankSaving = false;
-  celebrate(entry.id);
-}
-
-rankUnlockBtn.addEventListener("click", () => finishRank(true));
-rankElseBtn.addEventListener("click", () => finishRank(false));
+relaxBtn.addEventListener("click", () => exitWith("relax"));
+mattersBtn.addEventListener("click", () => exitWith(targetUrl ? "matters" : null));
 
 // The compose shrinks into the summoned star, which is then carried to its real
 // place in the sky; its real name and a thank-you line fade in. A "Continue" goes on.
@@ -840,8 +1262,11 @@ rankElseBtn.addEventListener("click", () => finishRank(false));
 function celebrate(id) {
   if (celebrating) return;
   celebrating = true;
+  stopBreath();                                 // the window is leaving; the pacer goes with it
+  stopClouds();
   document.body.classList.add("celebrating");   // restore a normal cursor (the wand is hidden now)
-  saveBtn.disabled = true; continueBtn.disabled = true;   // no second submit
+  openBtn.disabled = true; relaxBtn.disabled = true; mattersBtn.disabled = true;
+  continueBtn.disabled = true;   // no second submit
   modalOpen = false;
   updateWand();
   hideTip();
@@ -892,16 +1317,23 @@ function dismissCelebration() {
   celebrateMsg.classList.remove("show");
   celebrateContinue.classList.remove("show");
   resetFields();
+  relaxBtn.disabled = false; mattersBtn.disabled = false;
+  paintCountdown();                                // restores Continue + Open it anyway to their gated state
   if (bottomEl) bottomEl.classList.remove("hide");
   updateWand();
 }
 celebrateContinue.addEventListener("click", () => {
-  // The else-door still lights the star, but leads away instead of onward.
-  if (targetUrl && !rankIntentUnlock) { location.replace("about:blank"); return; }
-  if (targetUrl) proceed(); else dismissCelebration();
+  // The star is lit either way; the chosen exit decides where you go next.
+  if (pendingExit) { const x = pendingExit; pendingExit = null; routeExit(x); return; }
+  dismissCelebration();
 });
-composeClose.addEventListener("click", () => { resetFields(); closeCompose(); });
-composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) { resetFields(); closeCompose(); } });
+// ✕ behaves like "Back to what matters": light the star if anything was logged, then close the tab.
+composeClose.addEventListener("click", () => {
+  if (targetUrl) exitWith("matters");
+  else { resetFields(); closeCompose(); }
+});
+// clicking outside just puts the window away; what you logged stays for when you reopen a star
+composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) closeCompose(); });
 
 // ---------- merged pause countdown (replaces the separate hold page) ----------
 // Both Continue and Save stay grey, showing "(in Ns)", until this counts down the
@@ -925,9 +1357,9 @@ function countdownCanRun() {
 function paintCountdown() {
   if (pauseDone) {
     continueBtn.textContent = "Continue →";
-    saveBtn.textContent = saveLabel();
+    openBtn.textContent = "Open it anyway";
     continueBtn.disabled = false;
-    saveBtn.disabled = false;
+    openBtn.disabled = false;
     return;
   }
   const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
@@ -935,12 +1367,15 @@ function paintCountdown() {
     continueBtn.innerHTML = holdActive
       ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
       : 'Continue \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
+    openBtn.innerHTML = holdActive
+      ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
+      : 'Open it anyway \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
   } else {
     continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
+    openBtn.innerHTML = 'Open it anyway (in <span class="cd-num">' + secs + '</span>s)';
   }
-  saveBtn.innerHTML = saveLabel() + ' (in <span class="cd-num">' + secs + '</span>s)';
   continueBtn.disabled = holdMode() ? false : true;   // must stay pressable to hold
-  saveBtn.disabled = true;
+  openBtn.disabled = holdMode() ? false : true;
 }
 
 function finishCountdown() {
@@ -999,32 +1434,41 @@ async function clearPauseRemaining() {
   } catch (e) {}
 }
 
-// Hold-to-count-down: pressing the Continue button runs the countdown;
-// releasing (or sliding off) freezes it, progress kept and persisted.
-continueBtn.addEventListener("pointerdown", (e) => {
-  if (!holdMode() || pauseDone) return;
-  e.preventDefault();
-  holdActive = true;
-  paintCountdown();
-  startCountdown();
-});
+// Hold-to-count-down: pressing the sky Continue or the window's "Open it anyway"
+// runs the countdown; releasing (or sliding off) freezes it, progress kept and persisted.
 let suppressHoldClick = false;
-const endContinueHold = () => {
+// A release over the button synthesizes a click; swallow that one so finishing the
+// hold still asks for a deliberate click. Sliding off (leave/cancel) sends no click,
+// so it must NOT arm the flag, or it would eat the next real one.
+const endContinueHold = (overButton) => {
   if (!holdActive) return;
   holdActive = false;
-  // The release also synthesizes a click; swallow it so finishing the hold
-  // still asks for one deliberate click on "Continue →".
-  suppressHoldClick = true;
+  suppressHoldClick = !!overButton;
   haltCountdown();
   paintCountdown();
 };
-continueBtn.addEventListener("pointerup", endContinueHold);
-continueBtn.addEventListener("pointercancel", endContinueHold);
-continueBtn.addEventListener("pointerleave", endContinueHold);
+function bindHold(btn) {
+  btn.addEventListener("pointerdown", (e) => {
+    if (!holdMode() || pauseDone) return;
+    e.preventDefault();
+    suppressHoldClick = false;        // a fresh press always starts clean
+    holdActive = true;
+    paintCountdown();
+    startCountdown();
+  });
+  btn.addEventListener("pointerup", () => endContinueHold(true));
+  btn.addEventListener("pointercancel", () => endContinueHold(false));
+  btn.addEventListener("pointerleave", () => endContinueHold(false));
+}
+bindHold(continueBtn);
+bindHold(openBtn);
 
 window.addEventListener("blur", haltCountdown);
 window.addEventListener("focus", startCountdown);
-document.addEventListener("visibilitychange", () => { if (document.hidden) haltCountdown(); else startCountdown(); });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { haltCountdown(); stopBreath(); stopClouds(); }
+  else { startCountdown(); syncBreath(); syncClouds(); }   // come back to a breath that starts fresh
+});
 window.addEventListener("pagehide", () => { if (pauseReady && !pauseDone) savePauseRemaining(pauseRemaining); });
 
 async function initCountdown() {
@@ -1124,6 +1568,26 @@ nativeCursorZone(winToggle);
 
   washFromBg();
   await initCountdown();
+
+  // urge window: name the pull, or soften the window when the sky was opened on its own
+  if (targetUrl) {
+    try { urgeSiteEl.textContent = new URL(targetUrl).hostname.replace(/^www\./, ""); }
+    catch (e) { urgeSiteEl.textContent = "this site"; }
+  } else {
+    urgeStatementEl.textContent = "A quiet moment with your sky.";
+    urgeDecisionEl.hidden = true;
+    openBtn.classList.add("hidden");
+    relaxBtn.classList.add("hidden");
+    mattersBtn.textContent = "Light this star ✨";
+  }
+  thoughtStats = await loadThoughtStats();
+  initPills();
+  initWaveChart();
+  const savedBreath = await loadBreathPattern();
+  breathPattern = BREATH_PATTERNS.find((p) => p.id === savedBreath) || BREATH_PATTERNS[0];
+  paintBreathModes();
+  syncBreath();   // idle until a star opens the window; it never paces out of sight
+  syncClouds();
 
   feelings = await ensureSeededFeelings();
   bindCircumplexCells();
