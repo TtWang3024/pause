@@ -81,14 +81,15 @@ function stopHold() {
 
 async function onComplete() {
   // The hold is done. If a break is forced, go commit to its length next; otherwise unlock now.
+  // A caught binge-watching site always goes to commit: you choose how long to watch.
   let forceBreak = false;
   try {
     const settings = await chrome.runtime.sendMessage({ type: "getSettings" });
     forceBreak = !!(settings && settings.forceBreak);
   } catch (e) {}
 
-  if (forceBreak) {
-    hintEl.textContent = "Now set your break…";
+  if (forceBreak || (groupId || "").startsWith("binge:")) {
+    hintEl.textContent = forceBreak ? "Now set your break…" : "Now choose how long to watch…";
     location.replace(
       chrome.runtime.getURL("commit.html") +
       "?url=" + encodeURIComponent(targetUrl) +

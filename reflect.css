@@ -62,7 +62,7 @@ body { background: #04040a; color: #fff; }
   pointer-events: auto;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
-#bottom.hide { display: none; }   /* hidden once a star is open or the celebration is showing */
+#bottom.hide { display: none; }   /* the hint goes once a star is open or the celebration is showing */
 
 /* compose modal — hidden until a star is opened. z-index sits above the window
    toggle and any summoned star (both z-index 4) so nothing can swallow its clicks. */
@@ -198,7 +198,6 @@ body.compose-light .breath-mode.on { background: rgba(74,134,232,0.12); color: #
 }
 .wave-lvl:hover { border-color: #6aa3ff; color: #6aa3ff; }
 #wave-chart { flex: 1 1 auto; min-width: 0; height: 232px; background: rgba(128,128,128,0.1); border-radius: 10px; }
-#wave-now { stroke: rgba(128,128,128,0.8); stroke-width: 1; stroke-dasharray: 3 4; }
 #wave-path { fill: none; stroke: url(#wave-grad); stroke-width: 2.5; stroke-linecap: round; }
 .wgrid { stroke: rgba(128,128,128,0.25); stroke-width: 0.75; }
 
@@ -394,6 +393,7 @@ body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,6
   border: 1.5px dashed currentColor; background: rgba(255,255,255,0.7); width: 10ch; color: inherit;
 }
 
+/* the celebration's Continue: the only button left on the sky itself */
 .continue {
   align-self: center; margin-top: 2px;
   font-family: inherit; font-weight: 600; font-size: 19px;
@@ -402,9 +402,7 @@ body.compose-light .bface-chip[data-part="head area"] { background: rgba(45,45,6
 }
 #hint { margin: 0; font-size: 12px; opacity: 0.5; text-align: center; }
 
-/* grey + inert while the merged pause countdown is still running */
-.continue:disabled { background: #8a8f99; border-color: #8a8f99; color: rgba(255, 255, 255, 0.85); cursor: default; }
-/* monospaced, fixed-width countdown digits so Continue / Save never change width as they tick */
+/* monospaced, fixed-width countdown digits so "Open it anyway" never changes width as it ticks */
 .cd-num { font-variant-numeric: tabular-nums; display: inline-block; min-width: 2ch; text-align: center; }
 
 /* save celebration: the compose shrinks into a star that takes its place in the sky */

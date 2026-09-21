@@ -12,8 +12,15 @@ const DEFAULT_SETTINGS = {
   breakMessage: "Step away from the screen. Stretch. Breathe.",
   breakBackdoor: true,
   backdoorLockMin: 3,
+  sleepReminder: true,
+  sleepHours: 7.5,
+  sleepFromHour: 21,
   backdoorHoldSec: 20,
-  holdToContinue: true
+  holdToContinue: true,
+  starSeconds: 3,
+  bingeEnabled: true,
+  bingeHours: 2,
+  bingeNever: []
 };
 
 const groupsEl = document.getElementById("groups");
@@ -27,10 +34,18 @@ const resetOnReleaseEl = document.getElementById("reset-on-release");
 const forceBreakEl = document.getElementById("force-break");
 const magicStarsEl = document.getElementById("magic-stars");
 const breakMessageEl = document.getElementById("break-message");
+const sleepEnabledEl = document.getElementById("sleep-enabled");
+const sleepHoursEl = document.getElementById("sleep-hours");
+const sleepFromEl = document.getElementById("sleep-from");
 const backdoorEnabledEl = document.getElementById("backdoor-enabled");
 const backdoorLockEl = document.getElementById("backdoor-lock");
 const backdoorHoldEl = document.getElementById("backdoor-hold");
 const holdContinueEl = document.getElementById("hold-continue");
+const starSecondsEl = document.getElementById("star-seconds");
+const bingeEnabledEl = document.getElementById("binge-enabled");
+const bingeHoursEl = document.getElementById("binge-hours");
+const bingeNeverEl = document.getElementById("binge-never");
+const bingeListEl = document.getElementById("binge-list");
 const breakOptionsEl = document.getElementById("break-message-section");
 const tpl = document.getElementById("group-template");
 
@@ -135,6 +150,12 @@ function validTime(s) {
   return typeof s === "string" && /^\d{1,2}:\d{2}$/.test(s);
 }
 
+function clampHalf(v, min, max, fallback) {
+  const n = Math.round(parseFloat(v) * 2) / 2;
+  if (isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
+}
+
 function clampInt(v, min, max, fallback) {
   const n = parseInt(v, 10);
   if (isNaN(n)) return fallback;
@@ -169,10 +190,17 @@ saveBtn.addEventListener("click", async () => {
     forceBreak: forceBreakEl.checked,
     magicStars: magicStarsEl.checked,
     breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage,
+    sleepReminder: sleepEnabledEl.checked,
+    sleepHours: clampHalf(sleepHoursEl.value, 4, 12, 7.5),
+    sleepFromHour: clampInt(sleepFromEl.value, 17, 23, 21),
     breakBackdoor: backdoorEnabledEl.checked,
     backdoorLockMin: clampInt(backdoorLockEl.value, 0, 15, 3),
     backdoorHoldSec: clampInt(backdoorHoldEl.value, 5, 60, 20),
-    holdToContinue: holdContinueEl.checked
+    holdToContinue: holdContinueEl.checked,
+    starSeconds: clampInt(starSecondsEl.value, 1, 15, 3),
+    bingeEnabled: bingeEnabledEl.checked,
+    bingeHours: clampHalf(bingeHoursEl.value, 0.5, 12, 2),
+    bingeNever: bingeNeverEl.value.split("\n").map((x) => x.trim().toLowerCase().replace(/^https?:\/\//, "")).filter(Boolean)
   };
   await chrome.storage.sync.set({ settings });
   statusEl.textContent = "Saved.";
@@ -191,12 +219,69 @@ saveBtn.addEventListener("click", async () => {
   forceBreakEl.checked = !!s.forceBreak;
   magicStarsEl.checked = s.magicStars !== false;
   breakMessageEl.value = s.breakMessage ?? DEFAULT_SETTINGS.breakMessage;
+  sleepEnabledEl.checked = s.sleepReminder !== false;
+  sleepHoursEl.value = s.sleepHours ?? 7.5;
+  sleepFromEl.value = s.sleepFromHour ?? 21;
   backdoorEnabledEl.checked = s.breakBackdoor !== false;
   backdoorLockEl.value = s.backdoorLockMin ?? 3;
   backdoorHoldEl.value = s.backdoorHoldSec ?? 20;
   holdContinueEl.checked = !!s.holdToContinue;
+  starSecondsEl.value = s.starSeconds ?? 3;
+  bingeEnabledEl.checked = s.bingeEnabled !== false;
+  bingeHoursEl.value = s.bingeHours ?? 2;
+  bingeNeverEl.value = (s.bingeNever || []).join("\n");
   syncBreakVisibility();
+  renderBingeList();
 })();
+
+// ===== Binge-watching: caught sites =====
+// Caught sites live in storage.local (the background adds them), so removing
+// one takes effect at once, independent of the Save button.
+function formatSpent(ms) {
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return "under a minute today";
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return (h ? h + " h " : "") + (h && !m ? "" : m + " min ") + "today";
+}
+
+async function renderBingeList() {
+  let sites = [];
+  try { sites = (await chrome.runtime.sendMessage({ type: "bingeList" }))?.sites || []; } catch (e) {}
+  bingeListEl.innerHTML = "";
+  if (!sites.length) {
+    const empty = document.createElement("p");
+    empty.className = "binge-empty";
+    empty.textContent = "No sites yet.";
+    bingeListEl.appendChild(empty);
+    return;
+  }
+  for (const { site, ms } of sites) {
+    const row = document.createElement("div");
+    row.className = "binge-row";
+    const name = document.createElement("span");
+    name.className = "binge-site";
+    name.textContent = site;
+    const spent = document.createElement("span");
+    spent.className = "binge-spent";
+    spent.textContent = formatSpent(ms);
+    const del = document.createElement("button");
+    del.className = "act-delete";
+    del.type = "button";
+    del.title = "Take " + site + " out";
+    del.innerHTML = '<span class="btn-icon ico-delete" aria-hidden="true"></span>';
+    del.addEventListener("click", async () => {
+      try { await chrome.runtime.sendMessage({ type: "bingeRemove", site }); } catch (e) {}
+      renderBingeList();
+    });
+    row.append(name, spent, del);
+    bingeListEl.appendChild(row);
+  }
+}
+
+// A site can be caught while this page is open.
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.bingeSites) renderBingeList();
+});
 
 // ===== Break activities, stats, and history =====
 // These save immediately (independent of the main Save button).
@@ -458,18 +543,25 @@ saveBtn.addEventListener("click", async () => {
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === "local" && changes.breakLog) {
       log = Array.isArray(changes.breakLog.newValue) ? changes.breakLog.newValue : [];
-      renderAll();
+      colourThenRender();
     }
     if (area === "sync" && changes.breakActivities) {
       activities = Array.isArray(changes.breakActivities.newValue) ? changes.breakActivities.newValue : [];
-      renderAll();
+      colourThenRender();
     }
   });
+
+  // Give any new tag its saved colour first, so the list and the pie agree with the break screen.
+  async function colourThenRender() {
+    const tags = activities.map((a) => a.tag).concat(Object.keys(deriveTagTotals(log)).filter((t) => t !== "untagged"));
+    await ensureTagColors(tags);
+    renderAll();
+  }
 
   (async function initBreaks() {
     activities = await ensureSeededActivities();
     log = await loadBreakLog();
-    renderAll();
+    await colourThenRender();
   })();
 })();
 
@@ -584,6 +676,11 @@ saveBtn.addEventListener("click", async () => {
       row.className = "reflect-row";
       const when = document.createElement("span");
       when.className = "reflect-when"; when.textContent = formatDateTime(entry.ts);
+      if (entry.pending) {               // its star waits for the break to finish
+        const tag = document.createElement("span");
+        tag.className = "reflect-pending"; tag.textContent = "no break yet";
+        when.appendChild(tag);
+      }
       const body = document.createElement("div");
       body.className = "reflect-body";
       const lines = [];
@@ -597,6 +694,12 @@ saveBtn.addEventListener("click", async () => {
       if (bodyTxt) lines.push(`<div class="rb-line"><span class="rb-tag">body</span>${escapeHtml(bodyTxt)}</div>`);
       const moods = Array.isArray(entry.mood) ? entry.mood : (entry.mood ? [entry.mood] : []);
       if (moods.length) lines.push(`<div class="rb-line"><span class="rb-tag">mood</span>${escapeHtml(moods.join(" · "))}</div>`);
+      const rest = entry.rest;
+      if (rest && rest.durationMin) {    // the break that lit this star (activities may be names or objects)
+        const acts = (rest.activities || []).map((a) => (typeof a === "string" ? a : (a && a.name) || "")).filter(Boolean);
+        const restTxt = [rest.durationMin + " min"].concat(acts).join(" · ");
+        lines.push(`<div class="rb-line"><span class="rb-tag">rest</span>${escapeHtml(restTxt)}</div>`);
+      }
       body.innerHTML = lines.join("") || '<div class="rb-line">(empty)</div>';
       const del = document.createElement("button");
       del.className = "break-delete"; del.title = "Delete";

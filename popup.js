@@ -105,6 +105,9 @@ sectionInput.addEventListener("input", refreshButtons);
   ]);
   currentTab = tabs[0];
   settings = settingsResult;
+  // Caught binge-watching sites are not saved groups: keep them out of the
+  // picker and out of the settings this popup writes back.
+  if (settings && Array.isArray(settings.groups)) settings.groups = settings.groups.filter((g) => !g.binge);
   const lastUsedGroupId = localResult?.lastUsedGroupId;
 
   if (currentTab?.url) {

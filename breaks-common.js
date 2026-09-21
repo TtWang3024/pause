@@ -22,8 +22,39 @@ function hashString(s) {
   return h;
 }
 
+// Tags take palette slots in order of first sight, walking the palette in an
+// order that keeps neighbouring tags far apart in hue. The map is saved, so a
+// tag keeps its colour on every page and across reorders.
+const TAG_SLOT_ORDER = [0, 7, 2, 1, 8, 4, 6, 9, 3, 5];
+let tagSlots = null;   // { tag key: palette index } once ensureTagColors has run
+
+function tagKey(tag) {
+  return String(tag || "").trim().replace(/^#/, "").toLowerCase();
+}
+
+async function ensureTagColors(tags) {
+  let map = {};
+  try { map = (await chrome.storage.sync.get("breakTagColors")).breakTagColors || {}; } catch (e) {}
+  let changed = false;
+  for (const tag of tags || []) {
+    const key = tagKey(tag);
+    if (!key || Object.prototype.hasOwnProperty.call(map, key)) continue;
+    const uses = new Array(BREAK_PALETTE.length).fill(0);
+    for (const k in map) uses[map[k]] = (uses[map[k]] || 0) + 1;
+    let slot = TAG_SLOT_ORDER[0];
+    for (const i of TAG_SLOT_ORDER) if (uses[i] < uses[slot]) slot = i;   // least used; first in order on a tie
+    map[key] = slot;
+    changed = true;
+  }
+  if (changed) { try { await chrome.storage.sync.set({ breakTagColors: map }); } catch (e) {} }
+  tagSlots = map;
+  return map;
+}
+
 function tagColor(tag) {
   if (!tag) return { bg: "#ececec", border: "#cfcfcf" };
+  const key = tagKey(tag);
+  if (tagSlots && Object.prototype.hasOwnProperty.call(tagSlots, key)) return BREAK_PALETTE[tagSlots[key]];
   return BREAK_PALETTE[hashString(tag) % BREAK_PALETTE.length];
 }
 

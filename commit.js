@@ -14,14 +14,20 @@ const continueBtn = document.getElementById("continue-btn");
 const hintEl = document.getElementById("hint");
 const targetEl = document.getElementById("target");
 
-// Break length: discrete levels. Drag and scroll snap to these; typing / arrow
-// keys stay free (any 1 to 30) for precision.
-const LEVELS = [1, 3, 5, 10, 15, 20, 25, 30];
-const MIN = LEVELS[0];
-const MAX = LEVELS[LEVELS.length - 1];
+// Break length: three discrete levels. Drag, scroll and the arrow keys move
+// between them; a typed number settles on the nearest level on blur / Enter.
+let LEVELS = [3, 10, 30];
+let MIN = LEVELS[0];
+let MAX = LEVELS[LEVELS.length - 1];
+
+// A caught binge-watching site always comes here. With forced breaks off there
+// is no break to set, so the big dial chooses how long to watch instead.
+const isBinge = groupId.startsWith("binge:");
+const WATCH_LEVELS = [3, 5, 10, 15, 20, 25];
+let watchOnly = false;
 const STEP_PX = 100;    // pixels of accumulated scroll per level step (lower = more sensitive)
 const SCROLL_GAP = 400; // ms; a pause this long drops leftover scroll distance
-let value = MAX;
+let value = MIN;
 let wheelAccum = 0;
 let lastWheelAt = -100000;
 let lastWheelDir = 0;
@@ -59,7 +65,7 @@ function clamp(n) {
 
 function nearestLevel(v) {
   let best = LEVELS[0];
-  for (const L of LEVELS) if (Math.abs(L - v) < Math.abs(best - v)) best = L;
+  for (const L of LEVELS) if (Math.abs(L - v) <= Math.abs(best - v)) best = L;   // a tie (20) goes up: you asked for more
   return best;
 }
 
@@ -77,18 +83,15 @@ function render() {
   minsEl.value = String(value);
 }
 
+// Every way in (drag, scroll, keys, typing) lands on a level. The watch dial
+// for caught sites keeps free minutes, as it always did.
 function setValue(n) {
-  value = clamp(n);
+  value = watchOnly ? clamp(n) : nearestLevel(clamp(n));
   render();
 }
 
-function nudge(delta) {
-  const cur = parseInt(minsEl.value, 10);
-  setValue((Number.isFinite(cur) ? cur : value) + delta);
-}
-
-// Scroll moves to the next / previous discrete level.
-function scrollStep(dir) {
+// Scroll and the arrow keys move to the next / previous discrete level.
+function stepLevel(dir) {
   if (dir > 0) {
     const next = LEVELS.find((L) => L > value);
     setValue(next != null ? next : MAX);
@@ -105,13 +108,11 @@ function buildScale() {
     tick.className = "tick";
     tick.style.left = pct + "%";
     ticksEl.appendChild(tick);
-    if (L !== MIN) { // skip the 1-min label — it sits at the very edge
-      const label = document.createElement("span");
-      label.className = "scale-label";
-      label.style.left = pct + "%";
-      label.textContent = String(L);
-      scaleEl.appendChild(label);
-    }
+    const label = document.createElement("span");
+    label.className = "scale-label";
+    label.style.left = pct + "%";
+    label.textContent = String(L);
+    scaleEl.appendChild(label);
   }
 }
 
@@ -153,20 +154,21 @@ stageEl.addEventListener("wheel", (e) => {
   if (dir !== 0) lastWheelDir = dir;
 
   wheelAccum += delta;
-  while (wheelAccum >= STEP_PX) { scrollStep(1); wheelAccum -= STEP_PX; }
-  while (wheelAccum <= -STEP_PX) { scrollStep(-1); wheelAccum += STEP_PX; }
+  while (wheelAccum >= STEP_PX) { stepLevel(1); wheelAccum -= STEP_PX; }
+  while (wheelAccum <= -STEP_PX) { stepLevel(-1); wheelAccum += STEP_PX; }
 }, { passive: false });
 
 minsEl.addEventListener("input", () => {
   const digits = minsEl.value.replace(/\D/g, "").slice(0, 2);
   if (minsEl.value !== digits) minsEl.value = digits;
   const n = parseInt(digits, 10);
-  if (Number.isFinite(n)) { value = clamp(n); paint(); }
+  // The bar previews the nearest level while you type; the text settles on blur.
+  if (Number.isFinite(n)) { value = watchOnly ? clamp(n) : nearestLevel(clamp(n)); paint(); }
 });
 minsEl.addEventListener("blur", () => setValue(value));
 minsEl.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp") { e.preventDefault(); nudge(1); }
-  else if (e.key === "ArrowDown") { e.preventDefault(); nudge(-1); }
+  if (e.key === "ArrowUp") { e.preventDefault(); if (watchOnly) setValue(value + 1); else stepLevel(1); }
+  else if (e.key === "ArrowDown") { e.preventDefault(); if (watchOnly) setValue(value - 1); else stepLevel(-1); }
   else if (e.key === "Enter") { e.preventDefault(); proceed(); }
 });
 
@@ -200,13 +202,13 @@ async function proceed() {
   if (!targetUrl) return;
   setValue(parseInt(minsEl.value, 10));
   setSession(parseInt(sessionEl.value, 10));
-  // The hold-to-countdown already happened — commit is the last step, so unlock now
-  // with the committed break length + session (shared across the whole group).
-  try {
-    await chrome.runtime.sendMessage({
-      type: "grantAllowance", groupId, breakMinutes: value, allowanceMinutes: sessionValue
-    });
-  } catch (e) {}
+  // The gate already happened (the urge window or the hold-to-pause): commit is
+  // the last step, so unlock now with the committed break length + session
+  // (shared across the whole group).
+  const msg = watchOnly
+    ? { type: "grantAllowance", groupId, allowanceMinutes: value }
+    : { type: "grantAllowance", groupId, breakMinutes: value, allowanceMinutes: sessionValue };
+  try { await chrome.runtime.sendMessage(msg); } catch (e) {}
   location.replace(targetUrl);
 }
 
@@ -224,14 +226,14 @@ async function showRatingEcho(settings) {
   if (mean > -0.34 && mean < 0.34) return;   // mixed signal → stay silent
   const gnameRaw = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
   const gname = gnameRaw.trim();
-  const gLabel = (!gname || gname.toLowerCase() === "default") ? "this group" : gname;
+  let gLabel = (!gname || gname.toLowerCase() === "default") ? "this group" : gname;
+  if (isBinge) gLabel = groupId.slice("binge:".length);
   echoEl.textContent = mean <= -0.34
     ? `Lately, ${gLabel} mostly hasn't given you what you came for.`
     : `Lately, ${gLabel} has been landing.`;
 }
 
 (async function init() {
-  buildScale();
   if (!targetUrl) {
     hintEl.textContent = "No target URL. Open settings from the extensions menu.";
     continueBtn.disabled = true;
@@ -244,7 +246,27 @@ async function showRatingEcho(settings) {
     settings = await chrome.runtime.sendMessage({ type: "getSettings" });
   } catch (e) {}
   if (settings) applyBackground(settings.background);
-  setValue(MAX); // break always opens at the maximum — no setting, no memory
+  let site = "this site";
+  try { site = new URL(targetUrl).hostname.replace(/^www\./, ""); } catch {}
+  if (isBinge && !(settings && settings.forceBreak)) {
+    watchOnly = true;
+    LEVELS = WATCH_LEVELS;
+    MIN = LEVELS[0];
+    MAX = LEVELS[LEVELS.length - 1];
+    document.title = "How long to watch";
+    sessionEl.hidden = true;
+    document.getElementById("lead-a").textContent = "You've been on " + site + " a lot today.";
+    document.getElementById("lead-b").innerHTML = "<br />Next, I'll watch for";
+    minsEl.setAttribute("aria-label", "Watch length in minutes");
+    buildScale();
+    setValue(MIN); // opens at the shortest, so every longer watch is a choice you make
+    showRatingEcho(settings);
+    return;
+  }
+  if (isBinge) document.getElementById("lead-a").textContent = "Once I've watched " + site + " for";
+  if (isBinge) document.getElementById("lead-b").innerHTML = "min,<br />I will take a break for";
+  buildScale();
+  setValue(MIN); // opens at the shortest, so a longer break is a deliberate choice; no setting, no memory
   setSession(settings?.allowanceMinutes ?? SESSION_MAX); // session defaults to the settings allowance
   showRatingEcho(settings);
 })();

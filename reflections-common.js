@@ -101,7 +101,73 @@ function reflectionStarText(entry) {
     const peak = Math.max(...wave.map((p) => p.v || 0));
     return "rode an urge wave · peak " + peak + "/10 · " + wave.length + (wave.length === 1 ? " point" : " points");
   }
+  const rest = entry.rest;               // a break with nothing written before it still lights its star
+  if (rest && rest.durationMin) {
+    const acts = (rest.activities || []).map((a) => (typeof a === "string" ? a : (a && a.name) || "")).filter(Boolean);
+    return "rested " + rest.durationMin + " min" + (acts.length ? " · " + acts.slice(0, 3).join(" · ") : "");
+  }
   return "";
+}
+
+// ---------- the urge wave chart (reflection window and break screen) ----------
+// Time is left out on purpose: each tap is one step to the right, so the curve
+// reads as a sequence and never folds back on itself. Steps start roomy and
+// shrink once the points would overflow the width. Only the last few hours show.
+const WAVE_RECENT_MS = 4 * 60 * 60 * 1000;
+const WAVE_STEP_FRAC = 0.1;              // a roomy step is a tenth of the width
+
+function recentWave(pts, now) {
+  return (pts || []).filter((p) => p && now - p.ts <= WAVE_RECENT_MS);
+}
+
+// x for point i of n, from x0 across to at most x1; also the step, for sizing dots.
+function waveLayout(n, x0, x1) {
+  const w = x1 - x0;
+  const step = n > 1 ? Math.min(w * WAVE_STEP_FRAC, w / (n - 1)) : 0;
+  return { step, x: (i) => x0 + i * step };
+}
+
+// A smooth curve through P ([[x, y], ...], x evenly spaced) that stays between
+// neighbouring points: no overshoot above 10 or below 0, and a flat top at each
+// peak (monotone cubic, Fritsch-Carlson tangents).
+function wavePathD(P) {
+  if (P.length < 2) return "";
+  const n = P.length, h = P[1][0] - P[0][0];
+  const s = [];
+  for (let i = 0; i < n - 1; i++) s.push(h ? (P[i + 1][1] - P[i][1]) / h : 0);
+  const m = new Array(n);
+  m[0] = s[0]; m[n - 1] = s[n - 2];
+  for (let i = 1; i < n - 1; i++) {
+    m[i] = s[i - 1] * s[i] <= 0 ? 0 : (2 * s[i - 1] * s[i]) / (s[i - 1] + s[i]);   // a turn is flat
+  }
+  const f = (v) => v.toFixed(1);
+  let d = "M" + f(P[0][0]) + "," + f(P[0][1]);
+  for (let i = 0; i < n - 1; i++) {
+    d += "C" + f(P[i][0] + h / 3) + "," + f(P[i][1] + m[i] * h / 3) +
+         " " + f(P[i + 1][0] - h / 3) + "," + f(P[i + 1][1] - m[i + 1] * h / 3) +
+         " " + f(P[i + 1][0]) + "," + f(P[i + 1][1]);
+  }
+  return d;
+}
+
+// Dots shrink with the step so a crowded wave stays readable.
+function waveDotR(step, full) {
+  return step ? Math.max(1.6, Math.min(full, step * 0.35)) : full;
+}
+
+// A session's star is lit only once its break has finished: an entry saved on
+// "Open it anyway" or "Relax my body first" waits as `pending` until then.
+// The star picture: the one summoned on the reflection screen when known,
+// else a deterministic pick, so the same entry always shows the same star.
+const REFLECT_STAR_COUNT = 21;
+function reflectStarSrc(i) {
+  const p = "images/stars-" + String(i + 1).padStart(3, "0") + ".png";
+  try { return chrome.runtime.getURL(p); } catch (e) { return p; }
+}
+function entryStarSrc(entry) {
+  const n = entry && Number.isInteger(entry.star) && entry.star >= 0 && entry.star < REFLECT_STAR_COUNT
+    ? entry.star : starImageIndex(entry ? entry.id : "", REFLECT_STAR_COUNT);
+  return reflectStarSrc(n);
 }
 
 // Each reflection is ONE star within the window.
@@ -110,7 +176,7 @@ function reflectionStars(log, windowMonths, nowTs) {
   const start = nowTs - windowMs;
   const stars = [];
   for (const entry of log) {
-    if (!entry || entry.ts < start) continue;
+    if (!entry || entry.ts < start || entry.pending) continue;   // pending: its break has not finished yet
     const text = reflectionStarText(entry);
     if (!text) continue;                 // nothing logged → no star
     stars.push({ id: entry.id, text, ts: entry.ts });

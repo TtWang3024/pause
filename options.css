@@ -947,6 +947,22 @@ details[open] .fold-chevron { transform: rotate(90deg); }
   margin-right: 6px;
 }
 
+/* a session whose break has not finished yet: its star is not lit until then */
+.reflect-pending {
+  display: inline-block;
+  margin-left: 6px;
+  font-family: 'Figtree', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 6px;
+  vertical-align: 1px;
+}
+
 /* The back-door settings rows: small inline number fields. */
 .backdoor-row {
   margin: 8px 0 0;
@@ -963,3 +979,20 @@ details[open] .fold-chevron { transform: rotate(90deg); }
   background: transparent;
   color: inherit;
 }
+
+/* Binge-watching */
+.binge-sub { margin: 16px 0 8px; }
+#binge-never { min-height: 64px; }
+.binge-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #faf8f0;
+  margin-bottom: 6px;
+}
+.binge-site { font-weight: 600; }
+.binge-spent { color: var(--muted); font-size: 13px; margin-left: auto; font-variant-numeric: tabular-nums; }
+.binge-empty { margin: 0; color: var(--muted); font-size: 14px; }

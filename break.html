@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Break</title>
-  <link rel="stylesheet" href="break.css?v=2" />
+  <link rel="stylesheet" href="break.css?v=3" />
 </head>
 <body>
   <main id="stage">
@@ -11,6 +11,13 @@
     <p id="message"></p>
     <p id="timeline"><span id="time-left">00:00</span> left in your <span id="break-len">break</span></p>
     <div id="progress"><span id="progress-fill"></span></div>
+    <p id="spent-line" class="hidden"></p>
+
+    <!-- Late in the evening, a break is a good moment to stop for the night. -->
+    <div id="sleep-card" class="hidden">
+      <img id="sleep-moon" src="images/moon.png" alt="" />
+      <p id="sleep-line"></p>
+    </div>
 
     <!-- The urge wave keeps going through the break: same entry, same curve. -->
     <div id="urge-wave" class="hidden">
@@ -27,7 +34,6 @@
         <svg id="uw-chart" viewBox="0 0 400 140">
           <defs><linearGradient id="uw-grad" gradientUnits="userSpaceOnUse" x1="0" y1="6" x2="0" y2="134"><stop offset="0" stop-color="#1d4f86"/><stop offset="1" stop-color="#9cc7ee"/></linearGradient></defs>
           <g id="uw-grid"></g>
-          <line id="uw-now" x1="10" y1="6" x2="10" y2="134"/>
           <path id="uw-path"/>
           <g id="uw-dots"></g>
         </svg>
@@ -47,7 +53,11 @@
       <p id="pick-hint">Pick up to 3 things to do</p>
       <button id="add-reveal" type="button">+ Add an activity</button>
     </div>
-    <div id="activity-list"></div>
+    <!-- The board: area pills on top filter one field of activity pills tinted by area. -->
+    <div id="activity-board">
+      <div id="tag-bar" class="hidden"></div>
+      <div id="activity-list"></div>
+    </div>
     <div id="add-custom" class="hidden">
       <input id="custom-name" type="text" placeholder="something else…" autocomplete="off" spellcheck="false" />
       <input id="custom-tag" type="text" placeholder="tag" autocomplete="off" spellcheck="false" />
@@ -55,14 +65,26 @@
     </div>
 
     <!-- The back door (ported from the Android app): on every break; the
-         lock and hold lengths are set in Options. -->
+         lock and hold lengths are set in Options. The break itself ends at 00:00. -->
     <div id="end-row">
       <button id="return-btn" class="hidden" type="button">I choose to return</button>
-      <button id="done-btn" disabled>Break in progress</button>
     </div>
   </main>
+
+  <!-- The star moment: when the break ends, the session's star lights up here
+       for a few seconds before the sky returns. -->
+  <div id="star-moment" class="hidden">
+    <img id="star-moment-star" alt="" draggable="false" />
+    <div id="star-moment-msg">
+      <p class="sm-line">Thank you for resting.</p>
+      <p class="sm-line" id="star-moment-line">Your sky gained a star.</p>
+      <p class="sm-line" id="star-moment-rest"></p>
+    </div>
+  </div>
+
   <script src="breaks-common.js"></script>
   <script src="reflections-common.js"></script>
+  <script src="skymap.js"></script>
   <script src="break.js"></script>
 </body>
 </html>

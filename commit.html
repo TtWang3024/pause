@@ -7,7 +7,7 @@
 </head>
 <body>
   <main id="stage">
-    <p id="lead">Once I finish this <input id="session" class="session-input" type="text" inputmode="numeric" autocomplete="off" aria-label="Session length in minutes" /> min session,<br />I will take a break for</p>
+    <p id="lead"><span id="lead-a">Once I finish this</span> <input id="session" class="session-input" type="text" inputmode="numeric" autocomplete="off" aria-label="Session length in minutes" /> <span id="lead-b">min session,<br />I will take a break for</span></p>
 
     <div id="readout">
       <input id="mins" type="text" inputmode="numeric" autocomplete="off" aria-label="Break length in minutes" />
@@ -24,7 +24,7 @@
     </div>
 
     <button id="continue-btn" class="continue" type="button">Continue →</button>
-    <p id="hint">Drag the bar, scroll any direction, or type, then continue.</p>
+    <p id="hint">Drag the bar, scroll any direction, or type a number (it settles on the nearest level), then continue.</p>
     <p id="target"></p>
     <p id="rating-echo"></p>
   </main>

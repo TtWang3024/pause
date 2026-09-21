@@ -25,8 +25,24 @@ const DEFAULT_SETTINGS = {
   breakBackdoor: true,
   backdoorLockMin: 3,
   backdoorHoldSec: 20,
-  holdToContinue: true
+  holdToContinue: true,
+  sleepReminder: true,
+  sleepHours: 7.5,
+  sleepFromHour: 21,
+  starSeconds: 3,
+  bingeEnabled: true,
+  bingeHours: 2,
+  bingeNever: []
 };
+
+// Sites caught by the daily time limit live in storage.local ("bingeSites"),
+// not in the saved groups, so the Options Save button never overwrites them.
+// Each caught site becomes its own group, so one site's session never unlocks
+// another's.
+const BINGE_PREFIX = "binge:";
+const BINGE_PAUSE_SEC = 30;
+const TRACK_ALARM = "track";
+const TRACK_GAP_MS = 90 * 1000;   // a longer gap means the worker or machine slept: count nothing
 
 const BREAK_MIN = 1;
 const BREAK_MAX = 30;
@@ -68,7 +84,47 @@ async function getSettings() {
     ...g,
     schedule: g.schedule || { ...DEFAULT_GROUP_SCHEDULE }
   }));
+  // Caught sites go last, so a site the user also put in a group keeps that group.
+  const { bingeSites = [] } = await chrome.storage.local.get("bingeSites");
+  for (const site of bingeSites) merged.groups.push(bingeGroup(site));
   return merged;
+}
+
+function bingeGroup(site) {
+  return {
+    id: BINGE_PREFIX + site,
+    name: "Binge-watching",
+    binge: true,
+    sites: [site],
+    pauseSeconds: BINGE_PAUSE_SEC,
+    schedule: { ...DEFAULT_GROUP_SCHEDULE }
+  };
+}
+
+// One key per site: the hostname without "www." or "m.", so the phone and
+// desktop versions add up together.
+function siteKeyOf(url) {
+  let host;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    host = u.hostname.toLowerCase();
+  } catch { return null; }
+  return host.replace(/^(www\.|m\.)/, "") || null;
+}
+
+function localDay(now = new Date()) {
+  return now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-" + String(now.getDate()).padStart(2, "0");
+}
+
+// { day, totals: { site: ms }, grace: { site: ms } }; a new day starts empty.
+// grace holds the total at the moment a caught site was taken out of the list,
+// so taking it out gives a fresh allowance of hours instead of an instant re-catch.
+async function getSiteTime() {
+  const { siteTime } = await chrome.storage.local.get("siteTime");
+  const day = localDay();
+  if (!siteTime || siteTime.day !== day) return { day, totals: {}, grace: {} };
+  return { day, totals: siteTime.totals || {}, grace: siteTime.grace || {} };
 }
 
 // A rule is either "domain.com" or "domain.com/path/prefix".
@@ -187,7 +243,88 @@ async function redirectTabsInGroup(group, makeRedirectUrl) {
   }
 }
 
+// ---------- daily time per site, and the binge-watching catch ----------
+// Every 30 s: the front tab of the focused window counts, and so does any tab
+// playing sound (a video in the background). Nothing counts while the screen
+// is locked. Input idle still counts, because watching is idle.
+async function trackTick() {
+  const now = Date.now();
+  const { trackLastAt = 0 } = await chrome.storage.local.get("trackLastAt");
+  await chrome.storage.local.set({ trackLastAt: now });
+  const delta = now - trackLastAt;
+  if (!trackLastAt || delta <= 0 || delta > TRACK_GAP_MS) return;
+
+  const settings = await getSettings();
+  if (settings.bingeEnabled === false) return;
+  let idleState = "active";
+  try { idleState = await chrome.idle.queryState(15); } catch (e) {}
+  if (idleState === "locked") return;
+
+  const urls = [];
+  try {
+    const win = await chrome.windows.getLastFocused();
+    if (win && win.focused) {
+      const [front] = await chrome.tabs.query({ active: true, windowId: win.id });
+      if (front && front.url) urls.push(front.url);
+    }
+  } catch (e) {}
+  try {
+    for (const t of await chrome.tabs.query({ audible: true })) if (t.url) urls.push(t.url);
+  } catch (e) {}
+
+  const never = Array.isArray(settings.bingeNever) ? settings.bingeNever : [];
+  const sites = new Map();   // site -> one of its urls, for the group lookup
+  for (const url of urls) {
+    if (never.some((rule) => urlMatchesRule(url, rule))) continue;
+    const site = siteKeyOf(url);
+    if (site && !sites.has(site)) sites.set(site, url);
+  }
+  if (!sites.size) return;
+
+  const st = await getSiteTime();
+  for (const site of sites.keys()) st.totals[site] = (st.totals[site] || 0) + delta;
+  await chrome.storage.local.set({ siteTime: st });
+
+  const hours = Number.isFinite(settings.bingeHours) ? settings.bingeHours : DEFAULT_SETTINGS.bingeHours;
+  const limitMs = hours * 60 * 60 * 1000;
+  const caught = [];
+  for (const [site, url] of sites) {
+    // Already gated: by one of the user's groups, or by an earlier catch.
+    if (findGroupForUrl(url, settings.groups)) continue;
+    if (st.totals[site] - (st.grace[site] || 0) < limitMs) continue;
+    caught.push(site);
+  }
+  if (!caught.length) return;
+
+  const { bingeSites = [] } = await chrome.storage.local.get("bingeSites");
+  await chrome.storage.local.set({ bingeSites: bingeSites.concat(caught.filter((s) => !bingeSites.includes(s))) });
+  // Blocked now, not on the next visit: every open tab of the site goes to the gate.
+  const useReflect = settings.magicStars !== false;
+  for (const site of caught) {
+    const group = bingeGroup(site);
+    await redirectTabsInGroup(group, (url) => entryUrl(url, group.id, useReflect));
+  }
+}
+
+async function removeBingeSite(site) {
+  const { bingeSites = [] } = await chrome.storage.local.get("bingeSites");
+  await chrome.storage.local.set({ bingeSites: bingeSites.filter((s) => s !== site) });
+  await setGroupState(BINGE_PREFIX + site, null);
+  await chrome.alarms.clear("expire:" + BINGE_PREFIX + site);
+  const st = await getSiteTime();
+  st.grace[site] = st.totals[site] || 0;
+  await chrome.storage.local.set({ siteTime: st });
+}
+
+async function ensureTrackAlarm() {
+  const existing = await chrome.alarms.get(TRACK_ALARM);
+  if (!existing) await chrome.alarms.create(TRACK_ALARM, { periodInMinutes: 0.5 });
+}
+ensureTrackAlarm();
+chrome.runtime.onStartup.addListener(ensureTrackAlarm);
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === TRACK_ALARM) { await trackTick(); return; }
   if (!alarm.name.startsWith("expire:")) return;
   const groupId = alarm.name.slice("expire:".length);
   const state = await getGroupState(groupId);
@@ -255,6 +392,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.magicStars !== false) });
 });
 
+const claimedBreaks = new Set();   // break ends claimed during this worker's life (storage keeps the rest)
+
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "grantAllowance" && msg.groupId) {
     getSettings().then(async (settings) => {
@@ -277,6 +416,44 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     })();
     return true;
   }
+  // A break is logged and its star lit exactly once, however many tabs sit on
+  // the break page (every tab of the group lands there) and however often one
+  // reloads after 00:00. The first tab to ask wins; the others just move on.
+  if (msg?.type === "claimBreakEnd" && msg.groupId) {
+    const key = msg.groupId + ":" + (msg.end || "none");
+    const fresh = !claimedBreaks.has(key);         // decided before any await, so two asks cannot both win
+    claimedBreaks.add(key);
+    (async () => {
+      const { breakDone = {} } = await chrome.storage.local.get("breakDone");
+      const first = fresh && breakDone[msg.groupId] !== key;
+      if (first) { breakDone[msg.groupId] = key; await chrome.storage.local.set({ breakDone }); }
+      sendResponse({ first });
+    })();
+    return true;
+  }
+  // Break page: time spent today on the site behind this break.
+  if (msg?.type === "siteTimeToday") {
+    (async () => {
+      const site = siteKeyOf(msg.url || "");
+      if (!site) return sendResponse({ site: null, ms: 0 });
+      const st = await getSiteTime();
+      sendResponse({ site, ms: st.totals[site] || 0 });
+    })();
+    return true;
+  }
+  // Options: the caught sites with today's time on each.
+  if (msg?.type === "bingeList") {
+    (async () => {
+      const { bingeSites = [] } = await chrome.storage.local.get("bingeSites");
+      const st = await getSiteTime();
+      sendResponse({ sites: bingeSites.map((site) => ({ site, ms: st.totals[site] || 0 })) });
+    })();
+    return true;
+  }
+  if (msg?.type === "bingeRemove" && msg.site) {
+    removeBingeSite(msg.site).then(() => sendResponse({ ok: true }));
+    return true;
+  }
   // Content script asks whether to show the on-site reflect wand: only while
   // this page's group has an active allowance (free-browsing window).
   if (msg?.type === "reflectIconCheck") {
@@ -297,6 +474,7 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 chrome.runtime.onInstalled.addListener(async () => {
+  await ensureTrackAlarm();
   const { settings } = await chrome.storage.sync.get("settings");
   if (!settings) {
     await chrome.storage.sync.set({ settings: DEFAULT_SETTINGS });

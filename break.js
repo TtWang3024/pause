@@ -12,8 +12,9 @@ const progressFillEl = document.getElementById("progress-fill");
 const ratingEl = document.getElementById("rating");
 const ratingPromptEl = document.getElementById("rating-prompt");
 const listEl = document.getElementById("activity-list");
+const tagBarEl = document.getElementById("tag-bar");
+const spentLineEl = document.getElementById("spent-line");
 const pickHintEl = document.getElementById("pick-hint");
-const doneBtn = document.getElementById("done-btn");
 const customName = document.getElementById("custom-name");
 const customTag = document.getElementById("custom-tag");
 const customAdd = document.getElementById("custom-add");
@@ -22,11 +23,15 @@ const MAX_PICK = 3;
 let settings = null;
 let activities = [];
 const selected = new Map(); // id -> { id, name, tag }
-let unlocked = false;
+const tagFilter = new Set(); // area keys to show; empty shows every area
+let boardFullHeight = 0;     // the unfiltered field's height, held while filtering so the page never jumps
+let finished = false;        // the break has ended (at 00:00 or through the back door); nothing runs twice
 let durationMin = 0;
 let totalMs = 0;
 let hintTimer = null;
 let ratingValue = null;   // -1 / 0 / +1 once tapped; stays null if skipped
+let reduceMotion = false; // e-ink / reduced motion: the star appears without its pop
+let sky = null;           // a headless sky map, only to name the star this session lands on
 
 function applyBackground(bg) {
   if (!bg) return;
@@ -36,6 +41,8 @@ function applyBackground(bg) {
   } else if (bg.type === "custom" && bg.value) {
     document.body.style.background = bg.value;
     document.body.style.color = isLightColor(bg.value) ? "#000" : "#fff";
+    // a light custom colour takes the light text variants too (the inline colours above still win)
+    document.body.classList.toggle("theme-white", isLightColor(bg.value));
   }
 }
 
@@ -64,43 +71,91 @@ function flashHint(msg) {
   hintTimer = setTimeout(updateHint, 1600);
 }
 
+// Areas in the order they first appear among the activities.
+function boardTags() {
+  const seen = new Map();   // key -> label as typed
+  for (const a of activities) {
+    const key = tagKey(a.tag);
+    if (key && !seen.has(key)) seen.set(key, String(a.tag).trim().replace(/^#/, ""));
+  }
+  return seen;
+}
+
+function renderTagBar() {
+  const tags = boardTags();
+  for (const key of [...tagFilter]) if (!tags.has(key)) tagFilter.delete(key);
+  tagBarEl.innerHTML = "";
+  if (tags.size < 2) { tagBarEl.classList.add("hidden"); return; }   // one area has nothing to filter
+  tagBarEl.classList.remove("hidden");
+
+  const all = document.createElement("button");
+  all.type = "button";
+  all.className = "tag-pill tag-all" + (tagFilter.size === 0 ? " on" : "");
+  all.textContent = "All";
+  all.addEventListener("click", () => { tagFilter.clear(); renderTagBar(); renderChips(); });
+  tagBarEl.appendChild(all);
+
+  for (const [key, label] of tags) {
+    const c = tagColor(label);
+    const pill = document.createElement("button");
+    pill.type = "button";
+    pill.className = "tag-pill" + (tagFilter.has(key) ? " on" : "");
+    pill.style.background = c.bg;
+    pill.style.borderColor = c.border;
+    pill.style.setProperty("--ring", c.border);
+    pill.textContent = "#" + label;
+    pill.setAttribute("aria-pressed", tagFilter.has(key) ? "true" : "false");
+    pill.addEventListener("click", () => {
+      if (tagFilter.has(key)) tagFilter.delete(key); else tagFilter.add(key);
+      renderTagBar();
+      renderChips();
+    });
+    tagBarEl.appendChild(pill);
+  }
+}
+
 function renderChips() {
   listEl.innerHTML = "";
   if (!activities.length) {
     const empty = document.createElement("p");
     empty.className = "list-empty";
-    empty.textContent = "No saved activities yet. Add one below.";
+    empty.textContent = "No saved activities yet. Add one with the pill above.";
     listEl.appendChild(empty);
     return;
   }
   for (const a of activities) {
+    const on = selected.has(a.id);
+    // A picked pill stays in view whatever the filter, so a choice never disappears.
+    if (tagFilter.size && !on && !tagFilter.has(tagKey(a.tag))) continue;
     const c = tagColor(a.tag);
     const chip = document.createElement("button");
     chip.type = "button";
-    chip.className = "activity-chip" + (selected.has(a.id) ? " selected" : "");
-    chip.style.borderLeftColor = c.border;
+    chip.className = "activity-pill" + (on ? " selected" : "");
+    chip.style.background = c.bg;
+    chip.style.borderColor = c.border;
+    if (a.tag) chip.title = "#" + String(a.tag).replace(/^#/, "");
 
     const check = document.createElement("span");
-    check.className = "chip-check";
-    check.textContent = selected.has(a.id) ? "✓" : "";
+    check.className = "pill-check";
+    check.textContent = "✓";
     chip.appendChild(check);
 
     const name = document.createElement("span");
-    name.className = "chip-name";
+    name.className = "pill-name";
     name.textContent = a.name;
     chip.appendChild(name);
 
-    if (a.tag) {
-      const tag = document.createElement("span");
-      tag.className = "chip-tag";
-      tag.textContent = "#" + a.tag;
-      tag.style.background = c.bg;
-      tag.style.borderColor = c.border;
-      chip.appendChild(tag);
-    }
     chip.addEventListener("click", () => toggleSelect(a));
     listEl.appendChild(chip);
   }
+  if (!tagFilter.size) { listEl.style.minHeight = ""; boardFullHeight = listEl.offsetHeight; }
+  else if (boardFullHeight) listEl.style.minHeight = boardFullHeight + "px";
+}
+
+async function recolourBoard() {
+  await ensureTagColors(activities.map((a) => a.tag));
+  renderTagBar();
+  renderChips();
 }
 
 function toggleSelect(a) {
@@ -144,7 +199,7 @@ async function onCustomAdd() {
   customTag.value = "";
   if (selected.size < MAX_PICK) selected.set(a.id, { id: a.id, name, tag });
   updateHint();
-  renderChips();
+  await recolourBoard();
   customName.focus();
 }
 
@@ -173,50 +228,77 @@ function bindRating(groupLabel) {
   });
 }
 
+// ---- the bedtime card ----
+// Late in the evening it works out when you would wake if you went to bed now.
+// Arithmetic, not an alarm: no sound, nothing to dismiss.
+// How long today went on the site behind this break (a solo break has none).
+function formatSpent(ms) {
+  const mins = Math.round(ms / 60000);
+  const h = Math.floor(mins / 60), m = mins % 60;
+  if (!h) return m + " min";
+  return m ? h + " h " + m + " min" : h + " h";
+}
+
+async function paintSpentLine() {
+  if (!targetUrl) return;
+  let res = null;
+  try { res = await chrome.runtime.sendMessage({ type: "siteTimeToday", url: targetUrl }); } catch (e) {}
+  if (!res || !res.site || res.ms < 60000) return;
+  spentLineEl.textContent = "You've spent " + formatSpent(res.ms) + " on " + res.site + " today.";
+  spentLineEl.classList.remove("hidden");
+}
+
+const sleepCardEl = document.getElementById("sleep-card");
+const sleepLineEl = document.getElementById("sleep-line");
+
+function hhmm(d) {
+  return String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+}
+function tidyHours(h) {
+  return (Math.round(h * 10) % 10 === 0) ? String(Math.round(h)) : String(h);
+}
+function paintSleepCard() {
+  if (!settings || settings.sleepReminder === false) return;
+  const from = Number.isFinite(settings.sleepFromHour) ? settings.sleepFromHour : 21;
+  const hours = Number.isFinite(settings.sleepHours) ? settings.sleepHours : 7.5;
+  const now = new Date();
+  const h = now.getHours();
+  // the evening window runs from the chosen hour until the small hours
+  if (!(h >= from || h < 5)) return;
+  const wake = new Date(now.getTime() + hours * 60 * 60 * 1000);
+  sleepLineEl.innerHTML = "Go to bed now and you'll wake at <strong>" + hhmm(wake) +
+    "</strong> after " + tidyHours(hours) + " hours.";
+  sleepCardEl.classList.remove("hidden");
+}
+
 // ---- the urge wave rides through the break: same reflection entry, same curve ----
 const uwEl = document.getElementById("urge-wave");
 const uwGrid = document.getElementById("uw-grid");
-const uwNow = document.getElementById("uw-now");
 const uwPath = document.getElementById("uw-path");
 const uwDots = document.getElementById("uw-dots");
 const UW_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
 const UW_X0 = 10, UW_X1 = 392, UW_Y0 = 130, UW_YSPAN = 118;
-const UW_MIN_SPAN = 60000;
 let urgeEntry = null;       // the reflection entry whose wave this break extends
 let uwSaving = false;
+let uwFrozen = false;       // set when the break ends: no more points, no more redraws
 
 function uwY(v) { return UW_Y0 - (v / 10) * UW_YSPAN; }
-function uwX(ts, now) {
-  const pts = urgeEntry.wave;
-  const t0 = pts.length ? pts[0].ts : urgeEntry.ts;
-  const span = Math.max(UW_MIN_SPAN, now - t0);
-  return UW_X0 + Math.min(1, (ts - t0) / span) * (UW_X1 - UW_X0);
-}
+// Same layout as the reflection window: one even step per tap, last 4 hours only.
 function uwRender() {
   if (!urgeEntry) return;
-  const pts = urgeEntry.wave;
-  const now = Date.now();
+  const pts = recentWave(urgeEntry.wave, Date.now());
+  const { step, x } = waveLayout(pts.length, UW_X0, UW_X1);
+  const r = waveDotR(step, 3.5);
   uwDots.innerHTML = "";
-  for (const p of pts) {
+  pts.forEach((p, i) => {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", uwX(p.ts, now).toFixed(1));
+    c.setAttribute("cx", x(i).toFixed(1));
     c.setAttribute("cy", uwY(p.v).toFixed(1));
-    c.setAttribute("r", "3.5");
+    c.setAttribute("r", r.toFixed(1));
     c.setAttribute("fill", UW_COLORS[p.v] || "#5b96f5");
     uwDots.appendChild(c);
-  }
-  const nx = uwX(now, now).toFixed(1);
-  uwNow.setAttribute("x1", nx); uwNow.setAttribute("x2", nx);
-  if (pts.length < 2) { uwPath.setAttribute("d", ""); return; }
-  const P = pts.map((p) => [uwX(p.ts, now), uwY(p.v)]);
-  let d = "M" + P[0][0].toFixed(1) + "," + P[0][1].toFixed(1);
-  for (let i = 0; i < P.length - 1; i++) {   // catmull-rom → cubic bezier, kink-free
-    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
-    d += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + "," + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
-         " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + "," + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
-         " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
-  }
-  uwPath.setAttribute("d", d);
+  });
+  uwPath.setAttribute("d", wavePathD(pts.map((p, i) => [x(i), uwY(p.v)])));
 }
 let uwDirty = false;
 async function uwPersist() {
@@ -234,17 +316,18 @@ async function uwPersist() {
       const seen = new Set(urgeEntry.wave.map((p) => p.ts + ":" + p.v));
       for (const p of stored) if (!seen.has(p.ts + ":" + p.v)) urgeEntry.wave.push(p);
       urgeEntry.wave.sort((a, b) => a.ts - b.ts);
-      log[i] = urgeEntry;
+      log[i].wave = urgeEntry.wave.slice();   // only the wave: a star another tab has lit stays lit
       await saveReflectionLog(log);
     } catch (e) { break; }
   }
   uwSaving = false;
 }
+const URGE_STALE_MS = 6 * 60 * 60 * 1000;   // an activeUrge older than this belongs to an abandoned session
 async function initUrgeWave() {
   try {
     const { activeUrge } = await chrome.storage.local.get("activeUrge");
     if (!activeUrge || activeUrge.group !== groupId) return;
-    if (Date.now() - activeUrge.ts > 6 * 60 * 60 * 1000) return;   // a stale session, leave it be
+    if (Date.now() - activeUrge.ts > URGE_STALE_MS) return;   // a stale session, leave it be
     const log = await loadReflectionLog();
     const entry = log.find((r) => r.id === activeUrge.refId);
     if (!entry) return;
@@ -261,13 +344,20 @@ async function initUrgeWave() {
   uwEl.classList.remove("hidden");
   document.querySelectorAll(".uw-lvl").forEach((b) => {
     b.addEventListener("click", () => {
+      if (uwFrozen) return;
       urgeEntry.wave.push({ ts: Date.now(), v: parseInt(b.dataset.v, 10) });
       uwRender();
       uwPersist();
     });
   });
   uwRender();
-  setInterval(() => { if (urgeEntry && urgeEntry.wave.length) uwRender(); }, 1000);
+}
+// The break is ending: freeze the wave so a late tap cannot race the finalize
+// below, then let any write already on its way land before the log is read again.
+async function settleUrgeWave() {
+  uwFrozen = true;
+  document.querySelectorAll(".uw-lvl").forEach((b) => { b.disabled = true; });
+  while (uwSaving) await new Promise((r) => setTimeout(r, 50));
 }
 async function clearActiveUrge() {
   try {
@@ -285,6 +375,7 @@ function closeThisTab() {
 }
 
 function tick() {
+  if (finished) return;            // the back door ended it first
   const remaining = breakEnd - Date.now();
   timeLeftEl.textContent = format(remaining);
   if (totalMs > 0) {
@@ -294,19 +385,11 @@ function tick() {
   if (remaining <= 0) {
     timeLeftEl.textContent = "00:00";
     progressFillEl.style.width = "100%";
-    unlock();
+    finishBreak("done", durationMin);    // the break ends by itself: the whole length was rested
     return;
   }
   if (!holding) paintBackdoor();   // the hold interval paints while held
   setTimeout(tick, 250);
-}
-
-function unlock() {
-  unlocked = true;
-  doneBtn.disabled = false;
-  doneBtn.classList.add("ready");
-  doneBtn.textContent = "I'm done →";
-  returnBtn.classList.add("hidden");     // the break finished by itself
 }
 
 // ---- the back door (ported from the Android app) ----
@@ -320,14 +403,13 @@ let holdLeft = HOLD_MS;
 let holding = false;
 let holdTimer = null;
 let holdLast = 0;
-let returned = false;
 
 function backdoorLocked() {
   return (breakEnd - totalMs) + LOCK_MS - Date.now() > 0;
 }
 
 function paintBackdoor() {
-  if (returned || returnBtn.classList.contains("hidden")) return;
+  if (finished || returnBtn.classList.contains("hidden")) return;
   const lockedLeft = (breakEnd - totalMs) + LOCK_MS - Date.now();
   if (lockedLeft > 0) {
     returnBtn.classList.add("locked");
@@ -342,36 +424,17 @@ function paintBackdoor() {
     "I choose to return";
 }
 
-async function completeReturn() {
-  if (returned) return;
-  returned = true;
-  holding = false;
-  if (holdTimer) clearInterval(holdTimer);
-  returnBtn.disabled = true;
-  returnBtn.textContent = "Saving…";
+function completeReturn() {
+  if (finished) return;
   // The entry records the real minutes rested, never the promised length.
   const actualMin = Math.min(durationMin,
     Math.max(1, Math.round((totalMs - (breakEnd - Date.now())) / 60000)));
-  const log = await loadBreakLog();
-  log.unshift({
-    id: genId("b"),
-    ts: Date.now(),
-    durationMin: actualMin,
-    activities: Array.from(selected.values()),
-    ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
-  });
-  await saveBreakLog(log);
-  await clearActiveUrge();
-  if (solo) { closeThisTab(); return; }      // a standalone break ends quietly, nothing to unlock
-  await chrome.runtime.sendMessage({ type: "endBreakEarly", groupId });
-  const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
-  location.replace(chrome.runtime.getURL(entry) +
-    "?url=" + encodeURIComponent(targetUrl) +
-    "&group=" + encodeURIComponent(groupId));
+  returnBtn.textContent = "Saving…";
+  finishBreak("early", actualMin);
 }
 
 function startHold() {
-  if (returned || unlocked || backdoorLocked()) return;
+  if (finished || backdoorLocked()) return;
   if (holding) return;
   holding = true;
   holdLast = Date.now();
@@ -398,31 +461,173 @@ returnBtn.addEventListener("pointerup", stopHold);
 returnBtn.addEventListener("pointercancel", stopHold);
 returnBtn.addEventListener("pointerleave", stopHold);
 
-async function onDone() {
-  if (!unlocked) return;
-  doneBtn.disabled = true;
-  doneBtn.textContent = "Saving…";
+// ---- the end of a break: log it, light the session's star, show the star moment, move on ----
+// Both endings come through here: 00:00 ("done", the whole length) and the back
+// door ("early", the real minutes). The guard means nothing below runs twice.
+async function finishBreak(kind, minutes) {
+  if (finished) return;
+  finished = true;
+  const early = kind === "early";
+  holding = false;
+  if (holdTimer) clearInterval(holdTimer);
+  returnBtn.disabled = true;
+  document.body.classList.add("finished");
+  stageEl.inert = true;                            // no taps or tabbing into the page beneath the star
+  await settleUrgeWave();
+  // One tab logs the break and lights the star; every other tab on this same
+  // break (or a reload after 00:00) just moves on.
+  let first = true;
+  try {
+    const r = await chrome.runtime.sendMessage({ type: "claimBreakEnd", groupId, end: breakEnd });
+    if (r && r.first === false) first = false;
+  } catch (e) {}
+  if (!first) { moveOn(); return; }
+  if (early && !solo) {                            // the group's break state ends now, not at breakEnd
+    try { await chrome.runtime.sendMessage({ type: "endBreakEarly", groupId }); } catch (e) {}
+  }
+  const acts = Array.from(selected.values());
   const log = await loadBreakLog();
   log.unshift({
     id: genId("b"),
     ts: Date.now(),
-    durationMin,
-    activities: Array.from(selected.values()),
+    durationMin: minutes,
+    activities: acts,
     ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
   });
   await saveBreakLog(log);
+  if (settings?.magicStars === false) {            // no sky, no star: straight on, as before
+    await clearActiveUrge();
+    moveOn();
+    return;
+  }
+  const rest = {
+    ts: Date.now(),
+    durationMin: minutes,
+    activities: acts.map((a) => a.name),
+    ...(ratingValue !== null ? { rating: ratingValue } : {}),
+    early
+  };
+  const { entry, name } = await finalizeStar(rest);
   await clearActiveUrge();
-  if (solo) { closeThisTab(); return; }      // a standalone break ends quietly, nothing to unlock
-  // Restart the cycle: re-enter via the reflection screen when Magic Stars is on
-  // (its countdown then leads to commit), otherwise the plain hold-to-pause page.
-  const entry = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
-  const nextUrl = chrome.runtime.getURL(entry) +
-    "?url=" + encodeURIComponent(targetUrl) +
-    "&group=" + encodeURIComponent(groupId);
-  location.replace(nextUrl);
+  showStarMoment(entry, name, rest);
 }
 
-doneBtn.addEventListener("click", onDone);
+// The session's star: the pending entry written on the reflection screen (found
+// through activeUrge) takes this rest and is lit; a break with no entry behind it
+// gets a rest-only entry of its own. Returns the entry and the name of the real
+// catalogue star it lands on.
+async function finalizeStar(rest) {
+  let site = "";
+  try { site = new URL(targetUrl).hostname.replace(/^www\./, ""); } catch (e) {}
+  const fresh = () => ({ id: genId("r"), ts: rest.ts, thoughts: [], body: [], mood: [], ...(site ? { urge: site } : {}), rest });
+  let entry = null, log = [];
+  try {
+    log = await loadReflectionLog();
+    const { activeUrge } = await chrome.storage.local.get("activeUrge");
+    const live = activeUrge && activeUrge.group === groupId && Date.now() - activeUrge.ts <= URGE_STALE_MS;
+    if (live) entry = log.find((r) => r.id === activeUrge.refId) || null;
+    if (entry) {
+      delete entry.pending;                        // lit now; it keeps the moment it was written
+      entry.rest = rest;
+    } else {
+      entry = fresh();
+      log.unshift(entry);
+    }
+    await saveReflectionLog(log);
+  } catch (e) {}
+  if (!entry) entry = fresh();                     // nothing could be saved; the moment still shows a star
+  let name = "";                                   // no name while the sky data is still arriving
+  try {
+    if (sky && sky.isLoaded()) {                   // the data may still be arriving on a very short break
+      const months = await loadWindowMonths();
+      sky.setReflections(reflectionStars(log, months, rest.ts).stars, months, rest.ts);
+      const ref = sky.getRef(entry.id);
+      if (ref) name = ref.name;
+    }
+  } catch (e) {}
+  return { entry, name };
+}
+
+// ---- the star moment: the star pops in the middle, the lines fade in below, and
+// the page moves on once the star has been in front for starSeconds ----
+const stageEl = document.getElementById("stage");
+const starMomentEl = document.getElementById("star-moment");
+const starMomentStar = document.getElementById("star-moment-star");
+const starMomentMsg = document.getElementById("star-moment-msg");
+const starMomentLine = document.getElementById("star-moment-line");
+const starMomentRest = document.getElementById("star-moment-rest");
+
+function showStarMoment(entry, name, rest) {
+  starMomentStar.src = entryStarSrc(entry);
+  starMomentLine.textContent = "";                 // "Your sky gained a star Vega." (or no name while the sky data is missing)
+  starMomentLine.append("Your sky gained a star");
+  if (name) { const n = document.createElement("strong"); n.id = "star-moment-name"; n.textContent = name; starMomentLine.append(" ", n); }
+  starMomentLine.append(".");
+  starMomentRest.textContent = rest.durationMin + " min rested" +
+    (rest.activities.length ? " · " + rest.activities.join(" · ") : "");
+  starMomentEl.classList.remove("hidden");
+  starMomentStar.classList.remove("pop", "static");
+  const reveal = () => { starMomentMsg.classList.add("show"); startStarClock(); };   // the seconds count once the star has landed
+  if (reduceMotion) {
+    starMomentStar.classList.add("static");        // present at full size, no scale pop
+    setTimeout(reveal, 250);
+  } else {
+    void starMomentStar.offsetWidth;               // restart the pop keyframes
+    starMomentStar.classList.add("pop");
+    setTimeout(reveal, 500);
+  }
+}
+
+// The clock behind the moment counts only while this tab is visible and in front,
+// so a star lit in a background tab waits to be seen. A tick only adds time when
+// the tab was in front at the previous tick too, and never more than half a
+// second, so a late tick from a throttled background tab cannot count in full.
+let starTotalMs = 3000;      // settings.starSeconds, read at init
+let starMs = 0;              // time in front so far
+let starLast = 0;
+let starFront = false;       // whether the previous tick found the tab in front
+let starTimer = null;
+let movedOn = false;
+
+function tabInFront() {
+  return document.visibilityState === "visible" && document.hasFocus();
+}
+
+function starTick() {
+  const t = Date.now();
+  const front = tabInFront();
+  if (front && starFront) starMs += Math.min(t - starLast, 500);
+  starFront = front;
+  starLast = t;
+  if (starMs >= starTotalMs) {
+    if (starTimer) clearInterval(starTimer);
+    moveOn();
+  }
+}
+
+function startStarClock() {
+  starLast = Date.now();
+  starFront = tabInFront();
+  starTimer = setInterval(starTick, 100);
+  // hidden tabs throttle timers: check again the moment the tab is back, or focus changes
+  document.addEventListener("visibilitychange", starTick);
+  window.addEventListener("focus", starTick);
+  window.addEventListener("blur", starTick);
+}
+
+// Where the sky returns: a standalone break just closes; otherwise the cycle
+// restarts on the reflection screen when Magic stars is on (its window then
+// leads to commit), or the plain hold-to-pause page when it is off.
+function moveOn() {
+  if (movedOn) return;
+  movedOn = true;
+  if (solo) { closeThisTab(); return; }            // a standalone break ends quietly, nothing to unlock
+  const page = (settings?.magicStars !== false) ? "reflect.html" : "pause.html";
+  location.replace(chrome.runtime.getURL(page) +
+    "?url=" + encodeURIComponent(targetUrl) +
+    "&group=" + encodeURIComponent(groupId));
+}
+
 customAdd.addEventListener("click", onCustomAdd);
 customName.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAdd(); });
 customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAdd(); });
@@ -432,24 +637,35 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   if (settings) {
     applyBackground(settings.background);
     messageEl.textContent = settings.breakMessage || "Take a break.";
+    if (Number.isFinite(settings.starSeconds) && settings.starSeconds > 0) starTotalMs = settings.starSeconds * 1000;
   }
+  reduceMotion = (await loadReduceMotion()) ||
+    !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (reduceMotion) document.body.classList.add("reduce-motion");
+  // The sky map only names the star this session lands on. It loads in the
+  // background and is simply skipped if the break ends before the data arrives.
+  sky = createSkyMap(document.createElement("canvas"), {});
+  sky.load((p) => chrome.runtime.getURL(p)).catch(() => {});
   // The committed length comes from the URL; fall back to the max if absent.
   durationMin = Number.isFinite(minsParam) ? minsParam : 30;
   totalMs = durationMin * 60 * 1000;
   breakLenEl.textContent = durationMin > 0 ? `${durationMin}-minute break` : "break";
   const gname = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
-  const gLabel = (!gname.trim() || gname.trim().toLowerCase() === "default") ? "this group" : gname.trim();
+  let gLabel = (!gname.trim() || gname.trim().toLowerCase() === "default") ? "this group" : gname.trim();
+  if (groupId.startsWith("binge:")) gLabel = groupId.slice("binge:".length);   // a caught site: name the site
   if (solo) ratingEl.style.display = "none";   // nothing was unlocked, so there is nothing to rate
   else bindRating(gLabel);
   initUrgeWave();
+  paintSleepCard();
+  paintSpentLine();
   activities = await ensureSeededActivities();
   updateHint();
-  renderChips();
+  await recolourBoard();
 
-  if (!breakEnd || isNaN(breakEnd)) {
+  if (!breakEnd || isNaN(breakEnd)) {       // no end to wait for: the break is over as soon as it opens
     timeLeftEl.textContent = "00:00";
     progressFillEl.style.width = "100%";
-    unlock();
+    finishBreak("done", durationMin);
     return;
   }
   // The back door rides every break when Options allows it; its lock and

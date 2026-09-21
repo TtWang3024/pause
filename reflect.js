@@ -14,7 +14,6 @@ const bodyDots = document.getElementById("body-dots");
 const bodyTagsEl = document.getElementById("body-tags");
 const bodyHint = document.getElementById("body-hint");
 const circumplexEl = document.getElementById("circumplex");
-const continueBtn = document.getElementById("continue-btn");
 const urgeTimerEl = document.getElementById("urge-timer");
 const urgeSiteEl = document.getElementById("urge-site");
 const urgeStatementEl = document.getElementById("urge-statement");
@@ -33,7 +32,6 @@ const breathModesEl = document.getElementById("breath-modes");
 const urgeInfoBtn = document.getElementById("urge-info");
 const urgeInfoPop = document.getElementById("urge-info-pop");
 const waveGrid = document.getElementById("wave-grid");
-const waveNow = document.getElementById("wave-now");
 const wavePath = document.getElementById("wave-path");
 const waveDots = document.getElementById("wave-dots");
 const winToggle = document.getElementById("window-toggle");
@@ -45,8 +43,7 @@ const celebrateMsg = document.getElementById("celebrate-msg");
 const celebrateName = document.getElementById("celebrate-name");
 const celebrateContinue = document.getElementById("celebrate-continue");
 
-// The merged pause countdown greys the sky Continue and the unlock exit until it finishes.
-continueBtn.disabled = true;
+// The pause wait greys the unlock exit until it has counted down, or until something is logged.
 openBtn.disabled = true;
 
 const WAND_SMALL = 120;             // resting size on the star map (uses images/wand-120.png)
@@ -101,7 +98,7 @@ let sky = null;
 let skyDragging = false;
 let appSettings = null;     // cached settings (for forceBreak routing on proceed)
 let celebrating = false;    // save celebration playing → hide wand, freeze the sky
-let lastSummonSrc = "";     // the star image you summoned, reused in the celebration
+let lastSummonIdx = -1;     // which star image you summoned: shown in the celebration, kept on a pending entry
 let isLightBg = false;      // light star-map background → draw the wand trail/sparkles in dark warm ink
 let skyLastX = 0, skyLastY = 0;
 let skyRaf = 0;             // coalesces pan/zoom redraws to one per animation frame
@@ -237,7 +234,7 @@ function summonStar() {
   img.alt = ""; img.title = "Open a reflection";
   const n = Math.floor(Math.random() * STAR_SRCS.length);
   img.src = starSrc(n);
-  lastSummonSrc = img.src;
+  lastSummonIdx = n;
   img.addEventListener("error", () => { img.src = STAR_FALLBACKS[n % STAR_FALLBACKS.length]; }, { once: true });
   centerStar = img;
   document.body.appendChild(img);
@@ -512,7 +509,10 @@ function initPills() {
   pillItems = topThoughts(3).map((text) => ({ text, selected: false, custom: false }));
   renderPills();
 }
-function syncThoughts() { thoughts = pillItems.filter((p) => p.selected).map((p) => p.text); }
+function syncThoughts() {
+  thoughts = pillItems.filter((p) => p.selected).map((p) => p.text);
+  paintCountdown();                                // a kept thought opens the unlock door at once
+}
 
 // Each thought is a cloud: a white pill whose bumps ride on top, drifting at its
 // own slow pace and turning back at the edges. Hovering the sky holds them still
@@ -875,43 +875,28 @@ urgeInfoBtn.addEventListener("click", (e) => {   // a tap toggles it, for touch 
   if (urgeInfoPop.hidden) showUrgeInfo(); else hideUrgeInfo();
 });
 
-// ---------- the wave: tap a level, a point lands at the current moment ----------
-// The first tap anchors the left edge; the axis covers at least a minute and then
-// grows with the session, so the whole wave (pause and break) always fits.
+// ---------- the wave: tap a level, a point lands one step to the right ----------
+// Evenly spaced, not placed on a clock (see waveLayout in reflections-common.js).
 const WAVE_DOT_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
 const WAVE_X0 = 14, WAVE_X1 = 392, WAVE_Y0 = 222, WAVE_YSPAN = 212;
-const WAVE_MIN_SPAN = 60000;
-let wavePts = [];           // [{ ts, v }] — absolute times, level 0-10 in steps of 2
+let wavePts = [];           // [{ ts, v }]: tap time (kept in the log), level 0-10 in steps of 2
 
 function waveY(v) { return WAVE_Y0 - (v / 10) * WAVE_YSPAN; }
-function waveX(ts, now) {
-  if (!wavePts.length) return WAVE_X0;
-  const span = Math.max(WAVE_MIN_SPAN, now - wavePts[0].ts);
-  return WAVE_X0 + Math.min(1, (ts - wavePts[0].ts) / span) * (WAVE_X1 - WAVE_X0);
-}
 function renderWave() {
-  const now = Date.now();
+  const pts = recentWave(wavePts, Date.now());
+  const { step, x } = waveLayout(pts.length, WAVE_X0, WAVE_X1);
+  const r = waveDotR(step, 4.5);
   waveDots.innerHTML = "";
-  for (const p of wavePts) {
+  pts.forEach((p, i) => {
     const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    c.setAttribute("cx", waveX(p.ts, now).toFixed(1));
+    c.setAttribute("cx", x(i).toFixed(1));
     c.setAttribute("cy", waveY(p.v).toFixed(1));
-    c.setAttribute("r", "4.5");
+    c.setAttribute("r", r.toFixed(1));
     c.setAttribute("fill", WAVE_DOT_COLORS[p.v] || "#6aa3ff");
     waveDots.appendChild(c);
-  }
-  const nx = waveX(now, now).toFixed(1);
-  waveNow.setAttribute("x1", nx); waveNow.setAttribute("x2", nx);
-  if (wavePts.length < 2) { wavePath.setAttribute("d", ""); return; }
-  const P = wavePts.map((p) => [waveX(p.ts, now), waveY(p.v)]);
-  let d = "M" + P[0][0].toFixed(1) + "," + P[0][1].toFixed(1);
-  for (let i = 0; i < P.length - 1; i++) {   // catmull-rom → cubic bezier, kink-free
-    const p0 = P[Math.max(0, i - 1)], p1 = P[i], p2 = P[i + 1], p3 = P[Math.min(P.length - 1, i + 2)];
-    d += "C" + (p1[0] + (p2[0] - p0[0]) / 6).toFixed(1) + "," + (p1[1] + (p2[1] - p0[1]) / 6).toFixed(1) +
-         " " + (p2[0] - (p3[0] - p1[0]) / 6).toFixed(1) + "," + (p2[1] - (p3[1] - p1[1]) / 6).toFixed(1) +
-         " " + p2[0].toFixed(1) + "," + p2[1].toFixed(1);
-  }
-  wavePath.setAttribute("d", d);
+  });
+  paintCountdown();                                // a wave point opens the unlock door at once
+  wavePath.setAttribute("d", wavePathD(pts.map((p, i) => [x(i), waveY(p.v)])));
 }
 function initWaveChart() {
   [0, 2, 4, 6, 8, 10].forEach((v) => {
@@ -927,9 +912,6 @@ function initWaveChart() {
       renderWave();
     });
   });
-  setInterval(() => {                        // the now-line keeps drifting while the window is open
-    if (composeOverlay.classList.contains("open") && wavePts.length) renderWave();
-  }, 1000);
 }
 
 // ---------- segmented control: Wave · Body · Emotions · Thoughts ----------
@@ -979,6 +961,7 @@ function renderBodyTags() {
     bodyTagsEl.appendChild(row);
   });
   syncBodyDots();
+  paintCountdown();                                // a body tag opens the unlock door at once
 }
 function toggleBodyPart(part) {
   const idx = bodyTags.findIndex((t) => t.part === part);
@@ -1116,6 +1099,7 @@ function renderCircumplex() {
       cell.appendChild(chip);
     }
   }
+  paintCountdown();                                // a feeling opens the unlock door at once
 }
 function bindCircumplexCells() {
   for (const q of QUADRANTS) {
@@ -1165,10 +1149,12 @@ function resetFields() {
 }
 function openCompose() {
   composeOverlay.classList.add("open");
-  if (bottomEl) bottomEl.classList.add("hide");   // hide the screen's Continue while a star is open
+  if (bottomEl) bottomEl.classList.add("hide");   // hide the hint while a star is open
   modalOpen = true; updateWand();
   syncBreath();                                   // the breath starts when you can see it
   syncClouds();
+  paintCountdown();
+  startCountdown();                               // the wait (when it runs on its own) counts only while the window is open
 }
 function closeCompose() {
   composeOverlay.classList.remove("open");
@@ -1176,14 +1162,18 @@ function closeCompose() {
   modalOpen = false; updateWand();
   stopBreath();
   stopClouds();
+  haltCountdown();                                // closed: the wait freezes where it is
 }
 function reflectionHasContent() {
   return thoughts.length > 0 || bodyTags.length > 0 || selectedMoods.length > 0 || wavePts.length > 0;
 }
 
-// ---------- the three exits (and ✕): save whatever was logged, celebrate, then route ----------
-// "Open it anyway" is gated by the pause countdown; the other two are always one tap away.
-let pendingExit = null;     // "unlock" | "relax" | "matters" | null → routes after the celebration
+// ---------- the three exits (and ✕) ----------
+// "Open it anyway" and "Relax my body first" save what was logged as a pending star
+// (lit when the break behind it finishes) and leave at once; "Open it anyway" is
+// the one door with a wait on it. "Back to what matters" (and ✕) lights the star
+// here, with the celebration, then closes the tab.
+let celebrateExit = null;   // "matters" | null → routes after the celebration
 let exitSaving = false;
 
 function closeThisTab() {
@@ -1210,14 +1200,28 @@ async function routeExit(intent) {
   dismissCelebration();                            // no destination → back to the live sky
 }
 
+// The break page finds the session's entry through activeUrge; a pointer left by
+// an abandoned session must not attach itself to a break that had no reflection.
+async function clearGroupActiveUrge() {
+  try {
+    const { activeUrge } = await chrome.storage.local.get("activeUrge");
+    if (activeUrge && activeUrge.group === groupId) await chrome.storage.local.remove("activeUrge");
+  } catch (e) {}
+}
+
 async function exitWith(intent) {
   if (celebrating || exitSaving) return;
-  if (intent === "unlock" && !pauseDone) return;   // the countdown gates the unlock door only
+  if (intent === "unlock" && !gateOpen()) return;  // the wait gates the unlock door only
   if (!reflectionHasContent()) {
+    if (intent === "unlock" || intent === "relax") await clearGroupActiveUrge();
     if (intent) { await routeExit(intent); } else { resetFields(); closeCompose(); }
     return;
   }
   exitSaving = true;
+  // The star waits for the break that follows. "Open it anyway" with no break
+  // ahead (forced breaks off, not a caught site) lights it at once instead.
+  const breakFollows = !!(appSettings && appSettings.forceBreak) || groupId.startsWith("binge:");
+  const pending = intent === "relax" || (intent === "unlock" && breakFollows);
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
@@ -1228,7 +1232,9 @@ async function exitWith(intent) {
     id: genId("r"), ts: Date.now(), thoughts: thoughts.slice(), body, mood,
     ...(wavePts.length ? { wave: wavePts.slice() } : {}),
     ...(dwellMs > 1000 ? { dwellMs: Math.round(dwellMs) } : {}),   // how long you stayed with it
-    ...(site ? { urge: site } : {})
+    ...(site ? { urge: site } : {}),
+    ...(lastSummonIdx >= 0 ? { star: lastSummonIdx } : {}),   // the star you summoned is the one it shows
+    ...(pending ? { pending: true } : {})                       // unlit until the break finishes
   };
   for (const t of thoughts) {                      // frequency feeds the top-three pills
     const s = thoughtStats[t] || { n: 0, last: 0 };
@@ -1236,15 +1242,22 @@ async function exitWith(intent) {
     thoughtStats[t] = s;
   }
   await saveThoughtStats();
-  reflectionLog.unshift(entry);
-  await saveReflectionLog(reflectionLog);
-  renderStars();                                   // re-place: the new star is now in the sky
-  if (intent === "unlock") await clearPauseRemaining();
+  const log = await loadReflectionLog();           // fresh copy: another tab may have written since this page opened
+  log.unshift(entry);
+  await saveReflectionLog(log);
+  reflectionLog = log;
   if (intent === "unlock" || intent === "relax") {
-    // the break screen finds this and lets the wave keep going on the same entry
-    try { await chrome.storage.local.set({ activeUrge: { group: groupId, refId: entry.id, ts: entry.ts } }); } catch (e) {}
+    // the break screen finds this, keeps the wave going on the same entry, then lights it
+    if (pending) {
+      try { await chrome.storage.local.set({ activeUrge: { group: groupId, refId: entry.id, ts: entry.ts } }); } catch (e) {}
+    } else {
+      await clearGroupActiveUrge();
+    }
+    await routeExit(intent);                       // leaves the page; exitSaving stays set so nothing saves twice
+    return;
   }
-  pendingExit = intent;
+  renderStars();                                   // re-place: the new star is now in the sky
+  celebrateExit = intent;
   exitSaving = false;
   celebrate(entry.id);
 }
@@ -1265,9 +1278,9 @@ function celebrate(id) {
   stopBreath();                                 // the window is leaving; the pacer goes with it
   stopClouds();
   document.body.classList.add("celebrating");   // restore a normal cursor (the wand is hidden now)
-  openBtn.disabled = true; relaxBtn.disabled = true; mattersBtn.disabled = true;
-  continueBtn.disabled = true;   // no second submit
+  openBtn.disabled = true; relaxBtn.disabled = true; mattersBtn.disabled = true;   // no second submit
   modalOpen = false;
+  haltCountdown();                              // the window is gone: keep what it counted
   updateWand();
   hideTip();
   const ref = sky ? sky.getRef(id) : null;
@@ -1280,7 +1293,7 @@ function celebrate(id) {
   };
 
   const land = () => {
-    if (lastSummonSrc) celebrateStar.src = lastSummonSrc;
+    if (lastSummonIdx >= 0) celebrateStar.src = starSrc(lastSummonIdx);
     celebrateEl.classList.remove("hidden");
     celebrateStar.classList.remove("pop", "settle", "static");
     if (reduceMotion) {
@@ -1318,13 +1331,13 @@ function dismissCelebration() {
   celebrateContinue.classList.remove("show");
   resetFields();
   relaxBtn.disabled = false; mattersBtn.disabled = false;
-  paintCountdown();                                // restores Continue + Open it anyway to their gated state
+  paintCountdown();                                // restores "Open it anyway" to its gated state
   if (bottomEl) bottomEl.classList.remove("hide");
   updateWand();
 }
 celebrateContinue.addEventListener("click", () => {
   // The star is lit either way; the chosen exit decides where you go next.
-  if (pendingExit) { const x = pendingExit; pendingExit = null; routeExit(x); return; }
+  if (celebrateExit) { const x = celebrateExit; celebrateExit = null; routeExit(x); return; }
   dismissCelebration();
 });
 // ✕ behaves like "Back to what matters": light the star if anything was logged, then close the tab.
@@ -1335,10 +1348,12 @@ composeClose.addEventListener("click", () => {
 // clicking outside just puts the window away; what you logged stays for when you reopen a star
 composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) closeCompose(); });
 
-// ---------- merged pause countdown (replaces the separate hold page) ----------
-// Both Continue and Save stay grey, showing "(in Ns)", until this counts down the
-// group's pause length. It pauses when the page loses focus and resumes where it
-// left off (persisted per group, so a reload resumes too).
+// ---------- the pause wait, on "Open it anyway" ----------
+// The unlock exit shows "(in Ns)" until the group's pause length has counted down,
+// or until something is logged in the window, which opens the door at once. With
+// hold-to-continue on, the count runs only while the button is held; otherwise it
+// runs on its own while the window is open and the tab is visible. Progress is
+// kept per group, so closing the window or reloading resumes where it left off.
 let pauseTotalMs = 10000;
 let pauseRemaining = 10000;
 let pauseDone = false;
@@ -1349,33 +1364,33 @@ let pauseReady = false;     // true once the persisted remaining is loaded (guar
 function holdMode() { return !!(appSettings && appSettings.holdToContinue); }
 let holdActive = false;
 
+// The unlock door is open once the wait is over, or as soon as anything is logged
+// (a thought, a body tag, a feeling, a wave point). Taking it all out again brings
+// the wait back, wherever it had got to.
+function gateOpen() { return pauseDone || reflectionHasContent(); }
+
 function countdownCanRun() {
-  if (holdMode() && !holdActive) return false;   // hold-to-count-down: only while pressed
-  return !document.hidden;   // tick whenever the tab is visible; a visible-but-unfocused window must not freeze it (app-switch still pauses via the blur listener)
+  if (holdMode()) return holdActive;           // hold-to-count-down: only while pressed
+  // On its own: only while the window is open and the tab is visible. A visible-but-
+  // unfocused window must not freeze it (an app switch still pauses via the blur listener).
+  return modalOpen && !document.hidden;
 }
 
 function paintCountdown() {
-  if (pauseDone) {
-    continueBtn.textContent = "Continue →";
+  if (gateOpen()) {
     openBtn.textContent = "Open it anyway";
-    continueBtn.disabled = false;
     openBtn.disabled = false;
     return;
   }
   const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
   if (holdMode()) {
-    continueBtn.innerHTML = holdActive
-      ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
-      : 'Continue \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
     openBtn.innerHTML = holdActive
       ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
       : 'Open it anyway \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
   } else {
-    continueBtn.innerHTML = 'Continue (in <span class="cd-num">' + secs + '</span>s)';
     openBtn.innerHTML = 'Open it anyway (in <span class="cd-num">' + secs + '</span>s)';
   }
-  continueBtn.disabled = holdMode() ? false : true;   // must stay pressable to hold
-  openBtn.disabled = holdMode() ? false : true;
+  openBtn.disabled = !holdMode();              // must stay pressable to hold
 }
 
 function finishCountdown() {
@@ -1434,8 +1449,8 @@ async function clearPauseRemaining() {
   } catch (e) {}
 }
 
-// Hold-to-count-down: pressing the sky Continue or the window's "Open it anyway"
-// runs the countdown; releasing (or sliding off) freezes it, progress kept and persisted.
+// Hold-to-count-down: pressing "Open it anyway" runs the countdown; releasing (or
+// sliding off) freezes it, progress kept and persisted.
 let suppressHoldClick = false;
 // A release over the button synthesizes a click; swallow that one so finishing the
 // hold still asks for a deliberate click. Sliding off (leave/cancel) sends no click,
@@ -1449,7 +1464,7 @@ const endContinueHold = (overButton) => {
 };
 function bindHold(btn) {
   btn.addEventListener("pointerdown", (e) => {
-    if (!holdMode() || pauseDone) return;
+    if (!holdMode() || gateOpen()) return;       // the door is open: this press is a plain click
     e.preventDefault();
     suppressHoldClick = false;        // a fresh press always starts clean
     holdActive = true;
@@ -1460,7 +1475,6 @@ function bindHold(btn) {
   btn.addEventListener("pointercancel", () => endContinueHold(false));
   btn.addEventListener("pointerleave", () => endContinueHold(false));
 }
-bindHold(continueBtn);
 bindHold(openBtn);
 
 window.addEventListener("blur", haltCountdown);
@@ -1482,13 +1496,14 @@ async function initCountdown() {
   startCountdown();
 }
 
-// ---------- continue / proceed (the countdown gates this) ----------
+// ---------- proceed to the site (only through the open door) ----------
 async function proceed() {
-  if (!targetUrl || !pauseDone) return;
+  if (!targetUrl || !gateOpen()) return;
   await clearPauseRemaining();
-  if (appSettings && appSettings.forceBreak) {
+  pauseReady = false;                              // leaving: pagehide must not write the wait back
+  if ((appSettings && appSettings.forceBreak) || groupId.startsWith("binge:")) {
     location.replace(
-      chrome.runtime.getURL("commit.html") +    // a break is enforced → commit its length next
+      chrome.runtime.getURL("commit.html") +    // a break is enforced, or a binge site: commit the length next
       "?url=" + encodeURIComponent(targetUrl) +
       "&group=" + encodeURIComponent(groupId)
     );
@@ -1497,10 +1512,6 @@ async function proceed() {
   try { await chrome.runtime.sendMessage({ type: "grantAllowance", groupId }); } catch (e) {}
   location.replace(targetUrl);
 }
-continueBtn.addEventListener("click", () => {
-  if (suppressHoldClick) { suppressHoldClick = false; return; }
-  proceed();
-});
 
 // ---------- window toggle ----------
 function paintToggle() {
@@ -1517,8 +1528,7 @@ winToggle.querySelectorAll(".win-btn").forEach((b) => {
   });
 });
 
-// native cursor over the always-visible controls
-nativeCursorZone(continueBtn);
+// native cursor over the always-visible control
 nativeCursorZone(winToggle);
 
 // ---------- init ----------
