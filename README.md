@@ -1,6 +1,6 @@
 # Hold to Pause
 
-A Chrome extension that makes you stop and think before opening time-sink websites. Instead of blocking you outright, it adds friction at the moment of impulse. By default each blocked session opens on your **sky of reflections**: shake the wand, tap the star it summons, and an **"An urge is here"** window lets you name what is happening (the urge wave, where you feel it in your body, your mood, your thoughts). **Open it anyway** waits out the group's pause length (hold the button to count it down) unless you have logged something, in which case the wait is gone. Turn Magic stars off and it falls back to a full-screen timer that **only ticks while you hold the left mouse button**. Optionally, you **commit to a break** for each session and **take that break** afterward, a small in-the-moment decision instead of a rigid schedule; the session's star is lit when that break finishes. Reflections gather over time into a private **star map** drawn on a real night sky.
+A Chrome extension that makes you stop and think before opening time-sink websites. Instead of blocking you outright, it adds friction at the moment of impulse. By default each blocked session opens on your **sky of reflections**: shake the wand, tap the star it summons, and an **"An urge is here"** window lets you name what is happening (the urge wave, where you feel it in your body, your mood, your thoughts). **Open it anyway** waits out the group's pause length (hold the button to count it down) whether or not you log a reflection. Turn Magic stars off and it falls back to a soft light that glows while you hold the left mouse button; the wait is tracked without displaying seconds. Two questions come before the site opens (what set this off, and what you hope to get from it), one pops up halfway through (is it giving you what you hoped for?), and when the time is up an end-of-session screen asks again and lets you choose what comes next: a break, what matters to you, or opening it again. Breaks, sessions and reflections stay in history. Only completed small experiments light stars in the private **star map** drawn on a real night sky.
 
 ## Install (unpacked)
 
@@ -11,28 +11,26 @@ A Chrome extension that makes you stop and think before opening time-sink websit
 
 ## How it works
 
-The flow has two independent switches: **Magic stars** (the reflection screen, on by default) and **Force a break** (the commitment plus break). With both on:
+One switch shapes the flow: **Magic stars** (the reflection screen, on by default). With it on:
 
 ```
 Visit a blocked site
         ↓
 [ Sky ]             shake the wand, tap the star it summons: the "An urge is here"
-        ↓           window opens. Log nothing and "Open it anyway" waits out the
-        ↓           group's pause length (hold the button to count it down). Log a
-        ↓           thought, a body spot, a mood or a wave point and it is one tap
-        ↓           away; the star waits, unlit, for the break.
-[ Commit a break ]  "Once I finish this session, I will take a break for X min"
-        ↓
-   Allowance        3 to 25 min of free access, SHARED across the whole group
-        ↓           (a small wand icon floats top-left; tap it to reflect mid-session)
-[ Break ]           runs for X minutes; pick up to 3 activities, then rate the session.
-        ↓           At 00:00 it logs itself, lights the session's star and shows it
-        ↓           for a few seconds (only while the tab is in front)
-  The sky returns by itself, ready for the next urge
+        ↓           window (wave, body, mood, thoughts). Hold "Hold to pause" for the
+        ↓           group's pause length, or take one of the other exits.
+[ Before I open it ] two questions: what set this off, what do I hope to get.
+        ↓           Both answered, the site opens at once.
+   Session          the Settings length, SHARED across the whole group. Halfway
+        ↓           through, a card covers the page: is it giving you what you
+        ↓           hoped for? Hold Yes, Partly or No for 5 seconds.
+[ Time is up ]      the same question again, then: Take a break / Do what
+        ↓           matters to me / Open it again.
+[ Break ]           3, 10 or 30 minutes, picked on the break screen; activities,
+        ↓           rating, the back door. It ends by itself and the sky returns.
 ```
 
-- **Magic stars off** replaces the reflection screen with the classic **hold-to-pause** page (a full-screen countdown that only ticks while you hold the left mouse button).
-- **Force a break off** skips the commitment screen and the break, going straight to free access. A reflection saved on **Open it anyway** is then lit at once, since no break will follow.
+- **Magic stars off** replaces the reflection screen with the classic **hold-to-pause** page (a soft glow while you hold, with no countdown digits).
 
 The gate only fires when the group's **schedule** is active (day-of-week plus an optional time window).
 
@@ -81,28 +79,29 @@ While a group's allowance is active, a small **wand icon** floats at the top-lef
 
 Reflections are stored only on your device; review or delete them under **Settings → Magic stars**.
 
-## The commitment screen
+## Before I open it
 
-Shown right after **Open it anyway** (or the hold-to-countdown) **when Force a break is on**:
+Shown right after **Hold to pause** (or the hold-to-countdown): two short text boxes.
 
-> *"Once I finish this **[N]** min session, I will take a break for **[X]** minutes."*
+> *What set this off?* and *What do I hope to get from it?*
 
-- **Session length (N)** is your free-browsing time. It is typed only, defaults to the Settings allowance, range **3 to 25**. Editing it sets the allowance for this session.
-- **Break length (X)** snaps to three levels: **3, 10, 30**. It **opens at 3** (the shortest) and never remembers your last value, so a longer break is a deliberate choice you make each time. Set it by **drag** (snaps to the nearest level), **scroll** (slow steps one level at a time, a fast flick sweeps to the end), the **arrow keys** (one level per press), or **type** a number (it settles on the nearest level).
+Both need a few words; then **Open it** unlocks and the site opens at once for the Settings session length. There is no timer to set and no break to commit to; the answers are kept with the session.
 
-**Continue** unlocks the site for the allowance; the break afterward runs for exactly the minutes you committed.
+## Halfway through, and when time is up
 
-If you have rated this group's recent sessions on the break screen, a faint line here mirrors your own past answers back, for example *"Lately, Socials mostly hasn't given you what you came for."* It only informs your choice; it never changes, shortens, or blocks the length.
+- **Halfway** through the session, a card covers the page: *"Is it giving you what you hoped for?"*, with what you hoped for written under it. Hold **Yes**, **Partly** or **No** for 5 seconds (letting go starts over). Answered in one tab, it clears in every tab.
+- **When the time is up**, every tab of the group moves to the end-of-session screen: the same question once more, then *"What now?"*: **Take a break** (the break screen, where you pick 3, 10 or 30 minutes), **Do what matters to me** (the tab closes), or **Open it again** (back to the sky, for a fresh start with fresh answers). The screen waits: a new visit to the site lands on it until you have chosen.
+
+Every session's answers are listed under **Settings → Break → All sessions**.
 
 ## The break screen
 
-After the allowance ends (with Force a break on), a calm break screen:
+Chosen at the end of a session, a calm break screen (it opens with 3 / 10 / 30 to pick from):
 
-- Your own **message** leads (set in Settings, line breaks kept), with a highlighted line beneath it, *"MM:SS left in your N-minute break"* (the time monospaced), and a thin **progress bar** that fills as the break elapses.
-- **Pick up to 3** activities to do, or add a new one on the spot (which saves to your list).
-- The break **ends by itself** at 00:00: it logs the minutes and the activities you picked, lights the session's **star**, and holds it on screen for a few seconds (*"Thank you for resting. Your sky gained a star <Name>."* with the minutes and activities beneath) before the sky returns on its own (with Magic stars on; with it off, the hold-to-pause page returns at once). There is no button to press. That pause only counts while the tab is in front; its length is the **Star moment** setting (3 seconds by default). A break with no reflection behind it gets a star of its own, holding just the rest.
-- **I choose to return** is the way back by choice (on by default; the timing lives in Settings): locked for the first minutes of the break, then hold it for the set seconds. It ends the break the same way, star moment included, and the log keeps the minutes you actually rested.
-- **A one-tap rating**, *"Did {group} give you what you came for?"* with ○ Not really / ◐ Some of it / ● Yes, that. One tap, fully skippable, tap again to clear. It is mirrored back on the next commitment screen and never used to score or gate.
+- Your own **message** leads, followed by “A little space to rest” and a progress bar. Exact remaining time, elapsed time, and break duration are not displayed here.
+- The break **ends by itself** and logs its duration and chosen activities, then returns to the sky (or the classic pause page). It does not light a star.
+- **Hold to return** remains available according to your existing lock and hold settings. A small progress bar replaces its countdown digits. Ending early logs the time actually rested.
+- **A one-tap rating**, *"Did {group} give you what you came for?"* with ○ Not really / ◐ Some of it / ● Yes, that. One tap, fully skippable, tap again to clear. It is never used to score or gate.
 
 ## Break activities
 
@@ -143,14 +142,14 @@ All settings live in the options page (popup settings icon, or `chrome://extensi
 
 **General**
 - **Groups.** A **horizontal segmented control**: each group is a tab and one editor shows at a time, so the page stays short however many groups you have. The "+" tab adds a group. Each group has a name, sites (one per line; domains and `domain/path` rules), **pause seconds**, a **schedule** (Mon to Sun toggles plus an optional start/end window that can wrap midnight), and a trash icon to delete.
-- **Countdown behavior.** *Reset timer on release* for the hold-to-pause page (pause where it is, or snap back to full), and *Hold to count down* for the reflection screen: **Open it anyway** only counts while you press and hold it, releasing pauses, progress kept; anything logged in the window removes the wait. Off, it counts down on its own while the window is open and the tab is in front.
-- **Session length.** The default free-browsing window (3 to 25 min); you can change it each time on the commitment screen.
+- **Countdown behavior.** *Reset timer on release* for the hold-to-pause page (pause where it is, or snap back to full), and *Hold to count down* for the reflection screen: **Open it anyway** only counts while you press and hold it, releasing pauses, progress kept; logging something does not remove the wait. Off, it counts down on its own while the window is open and the tab is in front.
+- **Session length.** How long a site stays open once the two questions are answered (3 to 25 min).
 - **Pause page background.** Black, white, or a custom hex colour (text colour flips by luminance). The reflection screen itself stays a night sky regardless.
 
 **Break**
-- An **intro** with the **Force a break** toggle and a short note on how forced breaks work (the dial opens at 3 minutes, so a longer break is a deliberate choice; levels 3, 10, 30).
+- An **intro** on how breaks fit the session (chosen at the end, 3 / 10 / 30 picked on the break screen).
 - **Ending a break early.** The *I choose to return* toggle, how many minutes of the break pass before it unlocks, and how many seconds to hold it.
-- **Break screen message.** The words shown on the break screen while you cool down (multi-line; line breaks are kept), shown when Force a break is on.
+- **Break screen message.** The words shown on the break screen while you cool down (multi-line; line breaks are kept).
 - **Break stats**, **Break activities**, and a foldable **All breaks** history.
 
 **Magic stars** (reflections)
@@ -166,13 +165,15 @@ Row actions (edit, delete, save, cancel, add) are icons. Break activities and re
 | File | Purpose |
 |---|---|
 | `manifest.json` | Extension manifest (MV3) |
-| `background.js` | Service worker: intercepts navigation, routes reflect/pause/commit/break by the Magic stars and Force a break switches, per-group allowance, break, and schedule logic |
-| `reflect.html` / `reflect.css` / `reflect.js` | Reflection screen: wand cursor and trailing-ribbon trail, shake-to-summon star, the "An urge is here" window (wave / body (rabbit map) / mood (circumplex) / thoughts) with its hold gate, the save celebration, and the planetarium star map |
-| `skymap.js` | The planetarium renderer: stereographic projection, pan and zoom, constellations, Milky Way, and reflections lit as a dense cluster on real stars |
+| `background.js` | Service worker: intercepts navigation, routes reflect/pause/intent/after/break, per-group session, break, and schedule logic, the sessions log |
+| `reflect.html` / `reflect.css` / `reflect.js` | Reflection screen: wand cursor and trailing-ribbon trail, shake-to-summon star, the "An urge is here" window (wave / body (rabbit map) / mood (circumplex) / thoughts) with its glowing hold gate and the planetarium star map |
+| `skymap.js` | The planetarium renderer: stereographic projection, pan and zoom, constellations, Milky Way, and completed experiments lit as a dense cluster on real stars |
 | `data/sky-*.json` | Bundled star data (stars, constellation lines, labels, star names, Milky Way), from open Hipparcos / d3-celestial datasets |
 | `pause.html` / `pause.css` / `pause.js` | Hold-to-countdown page (used when Magic stars is off) |
-| `commit.html` / `commit.css` / `commit.js` | Break-length commitment screen, with the faint past-rating echo |
-| `break.html` / `break.css` / `break.js` | Break page: message, highlighted time line, progress bar, activity picker, the one-tap session rating, the self-ending timer, and the star moment |
+| `intent.html` / `intent.js` | The two questions before a site opens |
+| `after.html` / `after.js` | The end-of-session questions and the choice of what comes next |
+| `session.css` / `session-common.js` | Shared look and helpers for the two session screens |
+| `break.html` / `break.css` / `break.js` | Break page: message, number-free progress bars, activity picker, one-tap session rating, and automatic completion |
 | `reflect-content.js` | Content script: floating wand icon and compact reflection panel on blocked sites while an allowance is active |
 | `popup.html` / `popup.css` / `popup.js` | Toolbar popup for quick block-from-current-tab |
 | `options.html` / `options.css` / `options.js` | Settings UI (General / Break / Magic stars tabs) |
@@ -186,7 +187,7 @@ Row actions (edit, delete, save, cancel, add) are icons. Break activities and re
 
 - Settings, break activities, and the reflection **feelings** palette sync across signed-in Chrome installs (`chrome.storage.sync`).
 - Allowance and break state, break history, **reflections**, the per-group pause countdown, and the last-used group are device-local (`chrome.storage.local`). Reflections never leave your machine.
-- Leaving the sky before the **Open it anyway** wait ends saves the remaining time per group, so revisiting any site in that group resumes where you left off; it resets once you unlock. The allowance and break, by contrast, are real-time windows that run from the moment you commit.
+- Leaving the sky before the **Open it anyway** wait ends saves the remaining time per group, so revisiting any site in that group resumes where you left off; it resets once you unlock. The session and break, by contrast, are real-time windows that run from the moment they start.
 - The wand cursor, trail, and star map appear only on the extension's own reflection screen. On live sites only a small wand icon and panel are injected (`reflect-content.js`); there is no cursor hijack on real pages.
 - Allowance and break state is keyed **per group**, not per domain.
 - Closing or reloading the break-page tab does **not** end the break early; state is tracked per group.

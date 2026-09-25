@@ -19,7 +19,6 @@ const DEFAULT_SETTINGS = {
   background: { type: "preset", value: "black" },
   allowanceMinutes: 5,
   resetOnRelease: false,
-  forceBreak: false,
   magicStars: true,
   breakMessage: "Step away from the screen. Stretch. Breathe.",
   breakBackdoor: true,
@@ -48,7 +47,8 @@ const BREAK_MIN = 1;
 const BREAK_MAX = 30;
 
 const REFLECT_PAGE = chrome.runtime.getURL("reflect.html");
-const COMMIT_PAGE = chrome.runtime.getURL("commit.html");
+const INTENT_PAGE = chrome.runtime.getURL("intent.html");   // the two questions before a site opens
+const AFTER_PAGE = chrome.runtime.getURL("after.html");     // the two questions when the session ends
 const PAUSE_PAGE = chrome.runtime.getURL("pause.html");
 const BREAK_PAGE = chrome.runtime.getURL("break.html");
 
@@ -198,21 +198,75 @@ async function setGroupState(groupId, state) {
   await chrome.storage.local.set({ groupStates });
 }
 
-// breakMinutesOverride is the per-session value committed on the commitment
-// screen; falls back to the settings default when absent.
-async function grantAllowance(groupId, settings, breakMinutesOverride, allowanceMinutesOverride) {
+// A session: the Settings allowance, then the end-of-session questions. A break
+// is chosen there, not committed up front, so breakEnd starts equal to allowanceEnd.
+async function grantAllowance(groupId, settings, sessionId) {
   const now = Date.now();
-  const allow = clampAllowanceMinutes(allowanceMinutesOverride);
-  const allowanceMinutes = allow != null ? allow : settings.allowanceMinutes;
+  const allowanceMinutes = clampAllowanceMinutes(settings.allowanceMinutes) || 5;
   const allowanceEnd = now + allowanceMinutes * 60 * 1000;
-  const committed = clampBreakMinutes(breakMinutesOverride);
-  const breakMinutes = committed != null ? committed : BREAK_MAX;
-  const breakEnd = settings.forceBreak
-    ? allowanceEnd + breakMinutes * 60 * 1000
-    : allowanceEnd;
-  await setGroupState(groupId, { allowanceEnd, breakEnd, breakMinutes });
+  await setGroupState(groupId, { sessionStart: now, allowanceEnd, breakEnd: allowanceEnd, breakMinutes: null, ...(sessionId ? { sessionId } : {}) });
   // Wake up at allowanceEnd to actively re-block the whole group's open tabs.
   await scheduleExpireAlarm(groupId);
+}
+
+// ---------- sessions: what set it off, what you hope for, and how it went ----------
+// sessionLog (storage.local, newest first): { id, ts, group, site, trigger, hope,
+// mid, end, next, endedAt }. The group state carries the live session's id.
+const SESSION_KEEP = 500;
+
+async function loadSessions() {
+  const { sessionLog = [] } = await chrome.storage.local.get("sessionLog");
+  return Array.isArray(sessionLog) ? sessionLog : [];
+}
+async function updateSession(id, fn) {
+  const log = await loadSessions();
+  const s = log.find((x) => x && x.id === id);
+  if (!s) return null;
+  fn(s);
+  await chrome.storage.local.set({ sessionLog: log });
+  return s;
+}
+
+async function startSession(groupId, targetUrl, trigger, hope) {
+  const settings = await getSettings();
+  const id = "s_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  const log = await loadSessions();
+  log.unshift({ id, ts: Date.now(), group: groupId, site: siteKeyOf(targetUrl) || "", trigger, hope, mid: null, end: null, next: null });
+  await chrome.storage.local.set({ sessionLog: log.slice(0, SESSION_KEEP) });
+  await grantAllowance(groupId, settings, id);
+  return id;
+}
+
+// The live session behind a URL, for the halfway check and the end screen.
+async function sessionFor(groupId) {
+  const state = await getGroupState(groupId);
+  if (!state || !state.sessionId) return { state, session: null };
+  const session = (await loadSessions()).find((s) => s && s.id === state.sessionId) || null;
+  return { state, session };
+}
+
+// The session's time is up: every tab of the group goes to the end-of-session
+// questions, and stays gated there (state.after) until they are answered.
+async function endAllowance(group, state, paused) {
+  await setGroupState(group.id, { ...state, after: true });
+  if (!paused) await redirectTabsInGroup(group, (url) => afterUrl(url, group.id));
+}
+
+function afterUrl(url, groupId) {
+  return AFTER_PAGE + "?url=" + encodeURIComponent(url) + "&group=" + encodeURIComponent(groupId);
+}
+function pickBreakUrl(url, groupId) {
+  return BREAK_PAGE + "?url=" + encodeURIComponent(url) + "&group=" + encodeURIComponent(groupId) + "&pick=1";
+}
+
+// "Take a break" chosen: the length is picked on the break screen itself.
+async function startBreak(groupId, minutes) {
+  const mins = clampBreakMinutes(minutes) || 3;
+  const now = Date.now();
+  const breakEnd = now + mins * 60 * 1000;
+  await setGroupState(groupId, { allowanceEnd: now, breakEnd, breakMinutes: mins });
+  await chrome.alarms.create("expire:" + groupId, { when: breakEnd });
+  return breakEnd;
 }
 
 // Schedules the next "this group's state changes" alarm.
@@ -388,7 +442,7 @@ async function startSnooze() {
   const tabs = await chrome.tabs.query({});
   for (const tab of tabs) {
     const u = tab.url || "";
-    if (!(u.startsWith(REFLECT_PAGE) || u.startsWith(PAUSE_PAGE) || u.startsWith(COMMIT_PAGE))) continue;
+    if (!(u.startsWith(REFLECT_PAGE) || u.startsWith(PAUSE_PAGE) || u.startsWith(INTENT_PAGE))) continue;
     let target = null;
     try { target = new URL(u).searchParams.get("url"); } catch (e) {}
     if (target && /^https?:/.test(target)) chrome.tabs.update(tab.id, { url: target });
@@ -421,9 +475,8 @@ async function reblockAll() {
     const group = findGroupForUrl(tab.url, settings.groups);
     if (!group || !scheduleActiveNow(group.schedule)) continue;
     const state = groupStates[group.id];
-    if (state && now < state.allowanceEnd) continue;
-    if (state && now < state.breakEnd) { chrome.tabs.update(tab.id, { url: breakUrl(tab.url, group.id, state) }); continue; }
-    chrome.tabs.update(tab.id, { url: entryUrl(tab.url, group.id, useReflect) });
+    const where = placeFor(tab.url, group.id, state, now, useReflect);
+    if (where) chrome.tabs.update(tab.id, { url: where });
   }
 }
 
@@ -440,6 +493,15 @@ async function restoreSnooze() {
   }
 }
 chrome.runtime.onStartup.addListener(restoreSnooze);
+
+// Where a tab on a blocked site belongs right now, or null when it may stay.
+function placeFor(url, groupId, state, now, useReflect) {
+  if (state && state.after) return afterUrl(url, groupId);                  // the session's questions wait
+  if (state && state.pickBreak) return pickBreakUrl(url, groupId);          // a break was chosen, its length not yet
+  if (state && now < state.allowanceEnd) return null;
+  if (state && now < state.breakEnd) return breakUrl(url, groupId, state);
+  return entryUrl(url, groupId, useReflect);
+}
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === TRACK_ALARM) { await trackTick(); return; }
@@ -469,6 +531,13 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   // While the back door is open the state still moves on, but no tab is moved;
   // the end of the pause puts every tab where it belongs.
   const paused = (await snoozeUntil()) > 0;
+  if (state.after || state.pickBreak) { await chrome.alarms.clear("expire:" + groupId); return; }   // waiting on a choice, not on time
+  if (state.sessionId && state.breakEnd <= state.allowanceEnd) {
+    // The session's time is up → the end-of-session questions decide what comes next.
+    await endAllowance(group, state, paused);
+    await chrome.alarms.clear("expire:" + groupId);
+    return;
+  }
   if (now < state.breakEnd) {
     // Allowance just ended → kick the whole group into the break page, then schedule the break-end alarm.
     if (!paused) await redirectTabsInGroup(group, (url) => breakUrl(url, groupId, state));
@@ -486,7 +555,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (details.frameId !== 0) return;
   const url = details.url;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
-  if (url.startsWith(REFLECT_PAGE) || url.startsWith(COMMIT_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
+  if (url.startsWith(REFLECT_PAGE) || url.startsWith(INTENT_PAGE) || url.startsWith(AFTER_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
   if (await snoozeUntil()) return;                 // the back door is open
 
   const settings = await getSettings();
@@ -495,14 +564,8 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   if (!scheduleActiveNow(group.schedule)) return;
 
   const state = await getGroupState(group.id);
-  const now = Date.now();
-
-  if (state && now < state.allowanceEnd) return;
-  if (state && now < state.breakEnd) {
-    chrome.tabs.update(details.tabId, { url: breakUrl(url, group.id, state) });
-    return;
-  }
-  chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.magicStars !== false) });
+  const where = placeFor(url, group.id, state, Date.now(), settings.magicStars !== false);
+  if (where) chrome.tabs.update(details.tabId, { url: where });
 });
 
 const claimedBreaks = new Set();   // break ends claimed during this worker's life (storage keeps the rest)
@@ -510,9 +573,58 @@ const claimedBreaks = new Set();   // break ends claimed during this worker's li
 chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   if (msg?.type === "grantAllowance" && msg.groupId) {
     getSettings().then(async (settings) => {
-      await grantAllowance(msg.groupId, settings, msg.breakMinutes, msg.allowanceMinutes);
+      await grantAllowance(msg.groupId, settings, null);
       sendResponse({ ok: true });
     });
+    return true;
+  }
+  // The two questions before a site opens: answered → the session starts.
+  if (msg?.type === "startSession" && msg.groupId) {
+    (async () => {
+      const id = await startSession(msg.groupId, msg.url || "", String(msg.trigger || "").trim(), String(msg.hope || "").trim());
+      sendResponse({ ok: true, id });
+    })();
+    return true;
+  }
+  // The site's halfway check asks what it is, and reports the answer.
+  if (msg?.type === "sessionInfo") {
+    (async () => {
+      try {
+        const settings = await getSettings();
+        const url = msg.url || (sender.tab && sender.tab.url) || "";
+        const group = findGroupForUrl(url, settings.groups);
+        if (!group) return sendResponse({ session: null });
+        const { state, session } = await sessionFor(group.id);
+        if (!state || !session || Date.now() >= state.allowanceEnd) return sendResponse({ session: null });
+        sendResponse({ session: { id: session.id, group: group.id, start: state.sessionStart || (state.allowanceEnd - 5 * 60000), end: state.allowanceEnd, hope: session.hope, trigger: session.trigger, mid: session.mid } });
+      } catch (e) { sendResponse({ session: null }); }
+    })();
+    return true;
+  }
+  if (msg?.type === "sessionMid" && msg.id) {
+    updateSession(msg.id, (s) => { s.mid = msg.value; s.midTs = Date.now(); }).then(() => sendResponse({ ok: true }));
+    return true;
+  }
+  // The end screen asks for its session, then reports the answers and the choice.
+  if (msg?.type === "sessionAfter" && msg.groupId) {
+    (async () => {
+      const { state, session } = await sessionFor(msg.groupId);
+      sendResponse({ waiting: !!(state && state.after), session });
+    })();
+    return true;
+  }
+  if (msg?.type === "sessionEnd" && msg.groupId) {
+    (async () => {
+      const state = await getGroupState(msg.groupId);
+      if (state && state.sessionId) await updateSession(state.sessionId, (s) => { s.end = msg.check ?? null; s.next = msg.next; s.endedAt = Date.now(); });
+      if (msg.next === "break") await setGroupState(msg.groupId, { pickBreak: true, allowanceEnd: 0, breakEnd: 0 });
+      else { await setGroupState(msg.groupId, null); await chrome.alarms.clear("expire:" + msg.groupId); }
+      sendResponse({ ok: true });
+    })();
+    return true;
+  }
+  if (msg?.type === "startBreak" && msg.groupId) {
+    startBreak(msg.groupId, msg.minutes).then((end) => sendResponse({ ok: true, end }));
     return true;
   }
   if (msg?.type === "getSettings") {

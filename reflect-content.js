@@ -27,6 +27,99 @@
   if (!show) return;
   if (document.getElementById("__holdpause_reflect_host")) return;
 
+  // ---- the halfway check: is it giving you what you hoped for? ----
+  // Covers the page at the midpoint of the session until one of Yes / Partly /
+  // No has been held for five seconds. Answered in any tab, it clears in all.
+  (async function midCheck() {
+    let session = null;
+    try { session = (await chrome.runtime.sendMessage({ type: "sessionInfo", url: location.href }) || {}).session; } catch (e) { return; }
+    if (!session || session.mid) return;
+    const HOLD_MS = 5000;
+    const host = document.createElement("div");
+    host.id = "__holdpause_mid_host";
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `
+      <style>
+        :host { all: initial; }
+        .cover { position: fixed; inset: 0; z-index: 2147483646; background: rgba(8, 10, 18, 0.82);
+          display: flex; align-items: center; justify-content: center; padding: 24px;
+          font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #fff; }
+        .card { width: min(520px, 100%); background: #fff; color: #111; border-radius: 18px; padding: 26px 26px 22px;
+          box-shadow: 0 20px 60px rgba(0,0,0,.5); text-align: center; }
+        .eyebrow { margin: 0 0 6px; font-size: 12px; letter-spacing: .18em; text-transform: uppercase; opacity: .5; }
+        h2 { margin: 0 0 10px; font-size: 22px; font-weight: 700; line-height: 1.25; }
+        .hope { margin: 0 0 18px; font-size: 15px; color: #555; }
+        .hope strong { color: #111; }
+        .row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        button { position: relative; overflow: hidden; font: inherit; font-size: 16px; font-weight: 600; padding: 12px 24px;
+          border-radius: 999px; border: 1.5px solid #cfd3da; background: #fff; color: #111; cursor: pointer;
+          user-select: none; -webkit-user-select: none; touch-action: none; min-width: 108px; }
+        button .fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: rgba(106,163,255,.28); }
+        button .t { position: relative; font-variant-numeric: tabular-nums; }
+        button.holding { border-color: #6aa3ff; }
+        .foot { margin: 14px 0 0; font-size: 12px; color: #777; }
+      </style>
+      <div class="cover">
+        <div class="card">
+          <p class="eyebrow">Halfway through</p>
+          <h2>Is it giving you what you hoped for?</h2>
+          <p class="hope">You hoped for: <strong></strong></p>
+          <div class="row">
+            <button type="button" data-v="yes"><span class="fill"></span><span class="t">Yes</span></button>
+            <button type="button" data-v="partly"><span class="fill"></span><span class="t">Partly</span></button>
+            <button type="button" data-v="no"><span class="fill"></span><span class="t">No</span></button>
+          </div>
+          <p class="foot">Hold your answer for 5 seconds.</p>
+        </div>
+      </div>`;
+    root.querySelector(".hope strong").textContent = session.hope || "";
+    let shown = false, done = false;
+    const show = () => {
+      if (shown || done) return;
+      shown = true;
+      (document.body || document.documentElement).appendChild(host);
+    };
+    const finish = async (value) => {
+      if (done) return;
+      done = true;
+      try { await chrome.runtime.sendMessage({ type: "sessionMid", id: session.id, value }); } catch (e) {}
+      host.remove();
+    };
+    root.querySelectorAll("button").forEach((b) => {
+      const fill = b.querySelector(".fill"), label = b.querySelector(".t"), word = label.textContent;
+      let raf = 0, t0 = 0;
+      const paint = (ms) => {
+        fill.style.width = Math.min(100, (ms / HOLD_MS) * 100) + "%";
+        label.textContent = ms > 0 ? word + " \u00b7 " + Math.max(1, Math.ceil((HOLD_MS - ms) / 1000)) : word;
+      };
+      const stop = () => { if (!raf) return; cancelAnimationFrame(raf); raf = 0; b.classList.remove("holding"); paint(0); };
+      b.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        b.classList.add("holding");
+        t0 = performance.now();
+        const tick = (t) => {
+          const ms = t - t0;
+          if (ms >= HOLD_MS) { raf = 0; paint(HOLD_MS); finish(b.dataset.v); return; }
+          paint(ms);
+          raf = requestAnimationFrame(tick);
+        };
+        raf = requestAnimationFrame(tick);
+      });
+      ["pointerup", "pointerleave", "pointercancel"].forEach((ev) => b.addEventListener(ev, stop));   // letting go starts over
+    });
+    // Answered in another tab: this cover goes too.
+    try {
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area !== "local" || !changes.sessionLog) return;
+        const s = (changes.sessionLog.newValue || []).find((x) => x && x.id === session.id);
+        if (s && s.mid && !done) { done = true; host.remove(); }
+      });
+    } catch (e) {}
+    const mid = (session.start + session.end) / 2;
+    const wait = mid - Date.now();
+    if (wait <= 0) show(); else setTimeout(show, wait);
+  })();
+
   // Russell circumplex (kept in sync with reflections-common.js; content scripts
   // don't load that file, so the quadrant data lives here too).
   const QUADRANTS = ["tl", "tr", "bl", "br"];

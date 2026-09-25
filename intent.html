@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Before I open it</title>
+  <link rel="stylesheet" href="session.css" />
+</head>
+<body>
+  <main id="stage">
+    <p id="label">Before I open it</p>
+    <p id="lead">Two questions, then <strong id="site">the site</strong> opens.</p>
+
+    <div class="q">
+      <label for="trigger">What set this off?</label>
+      <textarea id="trigger" rows="2" placeholder="a notification, boredom, a hard task I was putting off…" autocomplete="off" spellcheck="false"></textarea>
+    </div>
+    <div class="q">
+      <label for="hope">What do I hope to get from it?</label>
+      <textarea id="hope" rows="2" placeholder="a laugh, the news, to switch off for a while…" autocomplete="off" spellcheck="false"></textarea>
+    </div>
+
+    <button id="open-btn" class="continue" type="button" disabled>Open it</button>
+    <p id="hint">Answer both and the site opens at once.</p>
+    <p id="target"></p>
+  </main>
+  <script src="session-common.js"></script>
+  <script src="intent.js"></script>
+</body>
+</html>

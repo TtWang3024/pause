@@ -10,8 +10,17 @@
   <main id="stage">
     <p id="label">On a break</p>
     <p id="message"></p>
-    <p id="timeline"><span id="time-left">00:00</span> left in your <span id="break-len">break</span></p>
-    <div id="progress"><span id="progress-fill"></span></div>
+    <p id="timeline">A little space to rest.</p>
+    <!-- Chosen from the end-of-session questions: the length is picked here. -->
+    <div id="pick-len" class="hidden">
+      <p id="pick-len-hint">How long a break?</p>
+      <div id="pick-len-row">
+        <button class="pick-btn" type="button" data-m="3">3 min</button>
+        <button class="pick-btn" type="button" data-m="10">10 min</button>
+        <button class="pick-btn" type="button" data-m="30">30 min</button>
+      </div>
+    </div>
+    <div id="progress" role="img" aria-label="Break progress"><span id="progress-fill"></span></div>
     <p id="spent-line" class="hidden"></p>
 
     <!-- Late in the evening, a break is a good moment to stop for the night. -->

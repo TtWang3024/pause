@@ -7,7 +7,6 @@ const DEFAULT_SETTINGS = {
   background: { type: "preset", value: "black" },
   allowanceMinutes: 5,
   resetOnRelease: false,
-  forceBreak: false,
   magicStars: true,
   breakMessage: "Step away from the screen. Stretch. Breathe.",
   breakBackdoor: true,
@@ -31,7 +30,6 @@ const statusEl = document.getElementById("status");
 const allowanceEl = document.getElementById("allowance");
 const bgCustomEl = document.getElementById("bg-custom");
 const resetOnReleaseEl = document.getElementById("reset-on-release");
-const forceBreakEl = document.getElementById("force-break");
 const magicStarsEl = document.getElementById("magic-stars");
 const breakMessageEl = document.getElementById("break-message");
 const sleepEnabledEl = document.getElementById("sleep-enabled");
@@ -46,7 +44,6 @@ const bingeEnabledEl = document.getElementById("binge-enabled");
 const bingeHoursEl = document.getElementById("binge-hours");
 const bingeNeverEl = document.getElementById("binge-never");
 const bingeListEl = document.getElementById("binge-list");
-const breakOptionsEl = document.getElementById("break-message-section");
 const tpl = document.getElementById("group-template");
 
 function uuid() {
@@ -175,11 +172,6 @@ function applyBackgroundUI(bg) {
   if (bg?.type === "custom" && bg.value) bgCustomEl.value = bg.value;
 }
 
-function syncBreakVisibility() {
-  breakOptionsEl.classList.toggle("hidden", !forceBreakEl.checked);
-}
-
-forceBreakEl.addEventListener("change", syncBreakVisibility);
 
 saveBtn.addEventListener("click", async () => {
   const settings = {
@@ -187,7 +179,6 @@ saveBtn.addEventListener("click", async () => {
     background: readBackground(),
     allowanceMinutes: clampInt(allowanceEl.value, 3, 25, 5),
     resetOnRelease: resetOnReleaseEl.checked,
-    forceBreak: forceBreakEl.checked,
     magicStars: magicStarsEl.checked,
     breakMessage: breakMessageEl.value.trim() || DEFAULT_SETTINGS.breakMessage,
     sleepReminder: sleepEnabledEl.checked,
@@ -216,7 +207,6 @@ saveBtn.addEventListener("click", async () => {
   applyBackgroundUI(s.background);
   allowanceEl.value = Math.min(25, Math.max(3, s.allowanceMinutes ?? 5));
   resetOnReleaseEl.checked = !!s.resetOnRelease;
-  forceBreakEl.checked = !!s.forceBreak;
   magicStarsEl.checked = s.magicStars !== false;
   breakMessageEl.value = s.breakMessage ?? DEFAULT_SETTINGS.breakMessage;
   sleepEnabledEl.checked = s.sleepReminder !== false;
@@ -230,7 +220,6 @@ saveBtn.addEventListener("click", async () => {
   bingeEnabledEl.checked = s.bingeEnabled !== false;
   bingeHoursEl.value = s.bingeHours ?? 2;
   bingeNeverEl.value = (s.bingeNever || []).join("\n");
-  syncBreakVisibility();
   renderBingeList();
 })();
 
@@ -563,6 +552,57 @@ chrome.storage.onChanged.addListener((changes, area) => {
     activities = await ensureSeededActivities();
     log = await loadBreakLog();
     await colourThenRender();
+  })();
+})();
+
+// ===== Sessions: the questions around each visit =====
+(function sessionsModule() {
+  const listEl = document.getElementById("sessions-list");
+  const countEl = document.getElementById("sessions-count");
+  const NEXT = { break: "took a break", matters: "did what matters", again: "opened it again" };
+  const CHECK = { yes: "yes", partly: "partly", no: "no" };
+
+  function render(log) {
+    countEl.textContent = log.length + " logged";
+    listEl.innerHTML = "";
+    if (!log.length) {
+      const p = document.createElement("p");
+      p.className = "help"; p.style.margin = "0"; p.textContent = "No sessions yet.";
+      listEl.appendChild(p);
+      return;
+    }
+    for (const s of log) {
+      const row = document.createElement("div");
+      row.className = "reflect-row";
+      const when = document.createElement("span");
+      when.className = "reflect-when";
+      when.textContent = formatDateTime(s.ts) + (s.site ? " · " + s.site : "");
+      const body = document.createElement("div");
+      body.className = "reflect-body";
+      const lines = [];
+      if (s.trigger) lines.push(`<div class="rb-line"><span class="rb-tag">set off by</span>${escapeHtml(s.trigger)}</div>`);
+      if (s.hope) lines.push(`<div class="rb-line"><span class="rb-tag">hoped for</span>${escapeHtml(s.hope)}</div>`);
+      const how = [s.mid ? "halfway: " + (CHECK[s.mid] || s.mid) : "", s.end ? "at the end: " + (CHECK[s.end] || s.end) : "", s.next ? NEXT[s.next] || s.next : ""].filter(Boolean).join(" · ");
+      lines.push(`<div class="rb-line"><span class="rb-tag">how it went</span>${how ? escapeHtml(how) : "(still open)"}</div>`);
+      body.innerHTML = lines.join("");
+      const del = document.createElement("button");
+      del.className = "break-delete"; del.title = "Delete";
+      del.innerHTML = '<span class="btn-icon ico-delete" aria-hidden="true"></span>';
+      del.addEventListener("click", async () => {
+        const { sessionLog = [] } = await chrome.storage.local.get("sessionLog");
+        await chrome.storage.local.set({ sessionLog: sessionLog.filter((x) => x && x.id !== s.id) });
+      });
+      row.appendChild(when); row.appendChild(body); row.appendChild(del);
+      listEl.appendChild(row);
+    }
+  }
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === "local" && changes.sessionLog) render(Array.isArray(changes.sessionLog.newValue) ? changes.sessionLog.newValue : []);
+  });
+  (async () => {
+    const { sessionLog = [] } = await chrome.storage.local.get("sessionLog");
+    render(Array.isArray(sessionLog) ? sessionLog : []);
   })();
 })();
 

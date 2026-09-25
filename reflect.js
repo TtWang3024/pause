@@ -1516,16 +1516,12 @@ async function proceed() {
   if (!targetUrl || !gateOpen()) return;
   await clearPauseRemaining();
   pauseReady = false;                              // leaving: pagehide must not write the wait back
-  if ((appSettings && appSettings.forceBreak) || groupId.startsWith("binge:")) {
-    location.replace(
-      chrome.runtime.getURL("commit.html") +    // a break is enforced, or a binge site: commit the length next
-      "?url=" + encodeURIComponent(targetUrl) +
-      "&group=" + encodeURIComponent(groupId)
-    );
-    return;
-  }
-  try { await chrome.runtime.sendMessage({ type: "grantAllowance", groupId }); } catch (e) {}
-  location.replace(targetUrl);
+  // Two questions before it opens: what set this off, what you hope to get.
+  location.replace(
+    chrome.runtime.getURL("intent.html") +
+    "?url=" + encodeURIComponent(targetUrl) +
+    "&group=" + encodeURIComponent(groupId)
+  );
 }
 
 // ---------- window toggle ----------

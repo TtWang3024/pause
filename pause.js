@@ -79,30 +79,13 @@ function stopHold() {
 }
 
 async function onComplete() {
-  // The hold is done. If a break is forced, go commit to its length next; otherwise unlock now.
-  // A caught binge-watching site always goes to commit: you choose how long to watch.
-  let forceBreak = false;
-  try {
-    const settings = await chrome.runtime.sendMessage({ type: "getSettings" });
-    forceBreak = !!(settings && settings.forceBreak);
-  } catch (e) {}
-
-  if (forceBreak || (groupId || "").startsWith("binge:")) {
-    hintEl.textContent = forceBreak ? "Now set your break…" : "Now choose how long to watch…";
-    location.replace(
-      chrome.runtime.getURL("commit.html") +
-      "?url=" + encodeURIComponent(targetUrl) +
-      "&group=" + encodeURIComponent(groupId)
-    );
-    return;
-  }
-
-  hintEl.textContent = "Going there now…";
-  try {
-    // No forced break — unlock straight away (allowance is shared across the whole group).
-    await chrome.runtime.sendMessage({ type: "grantAllowance", groupId });
-  } catch (e) {}
-  location.replace(targetUrl);
+  // The hold is done. Two questions before it opens: what set this off, what you hope to get.
+  hintEl.textContent = "Two quick questions…";
+  location.replace(
+    chrome.runtime.getURL("intent.html") +
+    "?url=" + encodeURIComponent(targetUrl) +
+    "&group=" + encodeURIComponent(groupId)
+  );
 }
 
 // Only count left-button drags

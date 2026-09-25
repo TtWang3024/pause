@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>The session is over</title>
+  <link rel="stylesheet" href="session.css" />
+</head>
+<body>
+  <main id="stage">
+    <p id="label">Time is up</p>
+    <p id="lead">Your time on <strong id="site">the site</strong> is over.</p>
+
+    <div class="q">
+      <label>Did it give me what I hoped for?</label>
+      <p class="echo" id="hope-echo"></p>
+      <div class="choices" id="check">
+        <button class="choice" type="button" data-v="yes">Yes</button>
+        <button class="choice" type="button" data-v="partly">Partly</button>
+        <button class="choice" type="button" data-v="no">No</button>
+      </div>
+    </div>
+
+    <div class="q">
+      <label>What now?</label>
+      <div class="choices" id="next">
+        <button class="choice primary" type="button" data-v="break" disabled>Take a break</button>
+        <button class="choice" type="button" data-v="matters" disabled>Do what matters to me</button>
+        <button class="choice" type="button" data-v="again" disabled>Open it again</button>
+      </div>
+      <p class="next-note" id="next-note">Answer the question above first.</p>
+    </div>
+
+    <p id="target"></p>
+  </main>
+  <script src="session-common.js"></script>
+  <script src="after.js"></script>
+</body>
+</html>

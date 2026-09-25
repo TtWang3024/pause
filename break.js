@@ -4,10 +4,9 @@ const breakEnd = parseInt(params.get("end"), 10);
 const groupId = params.get("group") || "";
 const minsParam = parseInt(params.get("mins"), 10);
 const solo = params.get("solo") === "1";   // "Relax my body first": a standalone break, nothing unlocks after
+const pickLen = params.get("pick") === "1"; // chosen at the end of a session: the length is picked here first
 
 const messageEl = document.getElementById("message");
-const timeLeftEl = document.getElementById("time-left");
-const breakLenEl = document.getElementById("break-len");
 const progressFillEl = document.getElementById("progress-fill");
 const ratingEl = document.getElementById("rating");
 const ratingPromptEl = document.getElementById("rating-prompt");
@@ -547,8 +546,23 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   updateHint();
   await recolourBoard();
 
+  if (pickLen && (!breakEnd || isNaN(breakEnd))) {
+    // Nothing runs until a length is chosen; the page then reloads with its end.
+    document.getElementById("timeline").hidden = true;
+    progressFillEl.parentElement.hidden = true;
+    const pick = document.getElementById("pick-len");
+    pick.classList.remove("hidden");
+    pick.querySelectorAll(".pick-btn").forEach((b) => b.addEventListener("click", async () => {
+      pick.querySelectorAll(".pick-btn").forEach((x) => { x.disabled = true; });
+      const mins = parseInt(b.dataset.m, 10);
+      let end = Date.now() + mins * 60000;
+      try { const r = await chrome.runtime.sendMessage({ type: "startBreak", groupId, minutes: mins }); if (r && r.end) end = r.end; } catch (e) {}
+      location.replace(chrome.runtime.getURL("break.html") + "?url=" + encodeURIComponent(targetUrl || "") +
+        "&group=" + encodeURIComponent(groupId) + "&end=" + end + "&mins=" + mins);
+    }));
+    return;
+  }
   if (!breakEnd || isNaN(breakEnd)) {       // no end to wait for: the break is over as soon as it opens
-    timeLeftEl.textContent = "00:00";
     progressFillEl.style.width = "100%";
     finishBreak("done", durationMin);
     return;
