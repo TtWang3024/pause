@@ -49,7 +49,7 @@ So if `youtube.com` and `reddit.com` are in one group, completing the pause once
 
 When **Magic stars** is on (the default), each blocked session opens on an unhurried sky where the wand replaces the hold-to-pause. There is no Continue button; the way onward is through a star. It is a gentle way to name what is happening before you dive in (*affect labeling*, an evidence-based way to take some heat out of an impulse).
 
-- **The gate.** Tap the star you summoned and the **"An urge is here"** window opens with three exits. **Open it anyway** is gated by the group's pause length: hold the button and the seconds count down (monospaced so they do not jitter); releasing pauses it and the progress is kept per group. With *Hold to count down* off in Settings it counts down on its own instead, but only while the window is open and the tab is in front. The moment you log anything (a thought, a body spot, a mood, a point on the wave) the wait disappears and **Open it anyway** is a plain tap; clear what you logged and the wait returns. **Relax my body first** starts a short standalone break, and **Back to what matters** (or ✕) closes the tab.
+- **The gate.** Tap the star you summoned and the **"An urge is here"** window opens with three exits. **Open it anyway** is gated by the group's pause length: hold the button while a gentle light pulses; releasing pauses it and the progress is kept per group. With *Hold to count down* off in Settings it counts down on its own instead, but only while the window is open and the tab is in front. Recording a reflection never shortens the wait; reflection stays optional. **Relax my body first** starts a short standalone break, and **Back to what matters** (or ✕) closes the tab.
 - **The wand.** Your cursor becomes a magic wand with a soft twinkle and a **trailing-ribbon** glow that flows behind your movement.
 - **Open a star.** Give the wand a little **shake** to summon a star in the middle of the screen, then tap it to open the urge window.
 - **Four prompts:**
@@ -65,13 +65,13 @@ When **Magic stars** is on (the default), each blocked session opens on an unhur
 The backdrop is a **real planetarium**, built from open Hipparcos-derived star data bundled offline:
 
 - **Drag to pan** across the dome, **scroll to zoom**. Real **constellation lines**, **constellation and bright-star names** (names fade in as you zoom), and a soft **Milky Way** band.
-- Reflections light up as a **dense cluster** that grows shell by shell from a centre (near Orion): the oldest takes the nearest star, each newer one the next-nearest free star, so your sky fills outward over time. **More recent reflections glow brighter.** Hover one to read your note plus the **real star's name**.
+- Completed experiments light up as a **dense cluster** that grows shell by shell from a centre (near Orion): the oldest takes the nearest star, each newer one the next-nearest free star, so your sky fills outward over time. **More recent experiments glow brighter.** Hover one to read your chosen action plus the **real star's name**.
 - Toggle the window between the last **1 month** and **6 months**.
-- All reflections are equal: no scores, no streaks, no judgement.
+- Experiment outcomes are treated equally: no scores, no streaks, no judgement.
 
 ### Reduced motion (e-ink friendly)
 
-A toggle in **Settings → Magic stars → Display** turns off the moving trail, the sparkles, and the twinkle, and plays the save celebration without the scale pop or the eased pan (the wand still follows your cursor, and the sky still pans). The star moment at the end of a break shows a still star, no pop. It is meant for e-ink and low-power screens that leave faint marks, and it also turns on automatically if your operating system's "reduce motion" setting is enabled.
+A toggle in **Settings → Magic stars → Display** turns off motion on the sky and the gentle pause glow. The box still opens on hover or keyboard focus, without an animated transition. System reduced-motion preferences are also respected.
 
 ### Mid-session
 
@@ -153,11 +153,10 @@ All settings live in the options page (popup settings icon, or `chrome://extensi
 **Magic stars** (reflections)
 - An **intro** with the **Enable magic stars** toggle (on opens each blocked session on the sky, where the wand and the urge window replace the hold-to-pause; off uses the plain hold-to-pause page).
 - **Display**: the star-map window (**1 month** or **6 months**) and the **Reduced motion** toggle.
-- **Star moment**: how many seconds (1 to 15, default 3) the new star stays on screen after a break before the sky returns. The clock only runs while that tab is in front.
 - **Feelings (mood map)**: the feelings offered on the circumplex, editable per quadrant, with the sun/moon/lily/cactus axis icons.
-- A foldable **All reflections** history (thoughts, body, mood), reviewable and deletable. An entry whose break has not happened yet carries a small *no break yet* tag beside its time; a rested entry shows a rest line, for example *10 min · Drink water · Box breathing*.
+- A foldable **All reflections** history (thoughts, body, mood), reviewable and deletable. Observations are marked as reflections. Completed experiments appear with their chosen action.
 
-Row actions (edit, delete, save, cancel, add) are icons. Break activities and reflections save on their own; the **Save** button covers groups, pause, background, break settings, and the star moment.
+Row actions (edit, delete, save, cancel, add) are icons. Break activities and reflections save on their own; the **Save** button covers groups, pause, background, break settings.
 
 ## Files
 
@@ -203,3 +202,17 @@ Row actions (edit, delete, save, cancel, add) are icons. Break activities and re
     - [Flower icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/flower) (lily)
     - [Sun icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/sun)
     - [Plus icons created by Freepik - Flaticon](https://www.flaticon.com/free-icons/plus)
+
+## Small experiments
+
+Open the **Pandora’s box icon** at the bottom of the opening sky to try a small experiment. The closed box opens and glows on hover or keyboard focus, with reduced-motion support. You can also choose **Try a small experiment** inside the reflection panel, on the classic pause or break screen, or inside the floating wand panel while viewing. Predict what stepping away might feel like, choose a small action (or write your own), and try it for 1–5 minutes. Discomfort ratings are optional.
+
+The number-free progress bar advances while you are away and survives reloading or reopening the experiment URL. Hide it or end early at any time. Review what actually happened, including “Nothing” pleasant or worthwhile, or skip the review. Then stay away two more minutes, finish for now (close this tab), or return through the existing viewing limits. Experiments never grant a new allowance or end a required break. Viewing time continues to elapse during experiments.
+
+Experiments navigate away from the current page, which stops its playback. Returning attempts to restore the position of a standard top-frame HTML5 video, paused; embedded, live, and custom players may not support restoration. The extension does not yet detect episode endings automatically. The break-page entry is available when the normal session timer ends.
+
+History is local to this device, accessible from Settings or the experiment's final screen. Each experiment has its own record, including prediction, optional ratings, action, elapsed interval, optional review and next choice. Missing answers remain unknown; elapsed time does not prove an activity was performed. Delete individual entries in history. Completing the chosen interval and reviewing or skipping the optional questions lights exactly one star. Early endings stay in history without an award. Old reflection and break entries remain in history but no longer light stars. Deleting an experiment also removes its star.
+
+Implementation: `experiment.html`, `experiment.css`, `experiment.js`, `experiment-launch.js`, and `experiment-background.js`. The background uses existing group state and navigation rules. Independent experiments in separate tabs share the group's original limits.
+
+Experiment checks: run `node --test tests/experiment-background.test.cjs tests/experiment-stars.test.cjs`. For the browser flow check, make Playwright available to Node, set `CHROME_EXECUTABLE` if using an installed browser, and run `node tests/experiment-ui.cjs`. The browser check uses isolated mock extension storage; live-site playback restoration still needs site-specific testing.

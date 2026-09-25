@@ -11,6 +11,7 @@
     <p class="sub">Hold the left mouse button to count down before visiting blocked sites.</p>
   </header>
 
+  <p><a href="experiment.html?history=1" target="_blank">Your small experiments · history and delete</a></p>
   <div class="save-bar">
     <button id="save" class="primary save-btn"><span class="save-ico" aria-hidden="true"></span>Save</button>
     <span id="status"></span>
@@ -43,7 +44,7 @@
           <p class="help">Off: releasing pauses the timer where it is. On: releasing snaps it back to full.</p>
           <label class="toggle">
             <input id="hold-continue" type="checkbox" />
-            <span>Hold to count down on the reflection screen: "Open it anyway" in the urge window only counts while you press and hold it. Releasing pauses; the progress is kept. Anything you log in that window removes the wait.</span>
+            <span>Hold to count down on the reflection screen: "Open it anyway" in the urge window only counts while you press and hold it. Releasing pauses; the progress is kept. Reflection is optional and does not shorten the wait.</span>
           </label>
           <p class="help" style="margin:4px 0 0;">Off: the wait counts down by itself while the window is open and the tab is in front.</p>
         </section>
@@ -169,11 +170,11 @@
       <div class="settings-panel" data-panel="magic">
         <section>
           <h2>Magic stars</h2>
-          <p class="help">Your "magic power" notes (thoughts, body, and mood) are captured before each session and shown as a star map on the reflection screen.</p>
-          <p class="help">The moment before you open a distracting site is an impulse. Naming what's happening (your thoughts, where you feel it in your body, your mood) is called <em>affect labeling</em>. Putting a feeling into words is an evidence-based way to loosen its grip, so each session can open with a small, unhurried reflection instead of a reflex. Your notes never leave your device. Over time they gather into a private <strong>star map</strong>, where more recent notes shine brighter. No scores, no streaks, no judgement. Just your own sky to glance back at.</p>
+          <p class="help">Your notes (thoughts, body, and mood) are saved in history. Each completed experiment lights one star on the sky.</p>
+          <p class="help">The moment before you open a distracting site is an impulse. Naming what's happening (your thoughts, where you feel it in your body, your mood) is called <em>affect labeling</em>. Putting a feeling into words is an evidence-based way to loosen its grip, so each session can open with a small, unhurried reflection instead of a reflex. Your notes never leave your device. Completed experiments gather into a private <strong>star map</strong>. Reflections and breaks stay in history without lighting stars. No scores, no streaks, no judgement. Just your own sky to glance back at.</p>
           <label class="toggle">
             <input id="magic-stars" type="checkbox" />
-            <span>Enable magic stars: open each blocked session with the reflection screen. Its countdown replaces the hold-to-pause and lives on "Open it anyway" in the urge window, which you reach by whirling the wand and opening a star; anything you log there removes the wait. When off, the plain hold-to-pause screen is used instead.</span>
+            <span>Enable magic stars: open each blocked session with the reflection screen. Its countdown replaces the hold-to-pause and lives on "Open it anyway" in the urge window, which you reach by whirling the wand and opening a star; logging something does not shorten the wait. When off, the plain hold-to-pause screen is used instead.</span>
           </label>
         </section>
 
@@ -195,7 +196,7 @@
           <p class="help" style="margin-top:4px;">The sky adapts its stars, lines, and labels so it stays readable on whatever colour you pick.</p>
         </section>
 
-        <section id="star-moment-section">
+        <section id="star-moment-section" hidden>
           <h2>Star moment</h2>
           <p class="help">A session's star is lit when its break finishes. The break page shows it for a moment, then moves on by itself.</p>
           <p class="backdoor-row">After a break, the new star stays on screen for

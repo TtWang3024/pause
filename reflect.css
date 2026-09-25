@@ -483,3 +483,65 @@ body.reduce-motion .summon-star { animation: summon-pop 0.4s cubic-bezier(0.2, 1
 }
 
 /* The front door: a dark card floating over the sky, after the compose. */
+
+/* A small discovery on the opening sky. Motion only responds to interaction. */
+.experiment-box {
+  position: relative;
+  display: block;
+  width: clamp(92px, 15vh, 130px);
+  padding: 0;
+  margin: 4px auto 20px;
+  border: 0;
+  border-radius: 20px;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-tap-highlight-color: transparent;
+}
+.experiment-box img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 0 10px rgba(244, 200, 104, .2));
+  transition: transform .25s ease, filter .25s ease;
+}
+.experiment-box:hover img,
+.experiment-box:focus-visible img {
+  transform: translateY(-5px) rotate(-4deg) scale(1.06);
+  filter: drop-shadow(0 0 18px rgba(244, 200, 104, .55));
+}
+.experiment-box:active img { transform: translateY(-1px) scale(.97); }
+.experiment-box:focus-visible { outline: 2px solid #f1d393; outline-offset: 6px; }
+.experiment-box:disabled { cursor: wait; opacity: .65; }
+.experiment-box-hint {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 85vw;
+  color: #f1dfb5;
+  font: 12px/1.4 'Figtree', sans-serif;
+  opacity: 0;
+  transition: opacity .2s ease;
+  pointer-events: none;
+}
+.experiment-box:hover .experiment-box-hint,
+.experiment-box:focus-visible .experiment-box-hint,
+.experiment-box.has-error .experiment-box-hint { opacity: 1; }
+body.reduce-motion .experiment-box img,
+body.reduce-motion .experiment-box-hint { transition: none; transform: none; }
+body.reduce-motion .experiment-box-hint { transform: translateX(-50%); }
+@media (prefers-reduced-motion: reduce) {
+  .experiment-box img { transition: none; transform: none !important; }
+  .experiment-box-hint { transition: none; }
+}
+@media (hover: none) { .experiment-box-hint { opacity: 1; } }
+
+/* Matching canvases keep the base of the box still as the lid opens. */
+.experiment-box .box-open { position: absolute; inset: 0; opacity: 0; }
+.experiment-box:hover .box-open, .experiment-box:focus-visible .box-open { opacity: 1; }
+.experiment-box:hover .box-closed, .experiment-box:focus-visible .box-closed { opacity: 0; }
+.experiment-box img { transition: opacity .2s ease, filter .25s ease; }
+.experiment-box:hover img, .experiment-box:focus-visible img, .experiment-box:active img { transform: none; }
+#urge-timer { display: none; }

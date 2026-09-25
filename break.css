@@ -31,13 +31,16 @@ body.theme-white {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: safe center;
   gap: 18px;
   text-align: center;
   padding: 40px;
   box-sizing: border-box;
   overflow-y: auto;
 }
+
+/* Scroll crowded break screens instead of collapsing the progress bar. */
+#stage > * { flex-shrink: 0; }
 
 #label {
   margin: 0;
@@ -220,11 +223,13 @@ body.theme-white {
 }
 #break-len { font-weight: 600; }
 #progress {
-  width: min(320px, 72%);
-  height: 7px;
+  width: min(420px, 90%);
+  height: 10px;
+  min-height: 10px;
+  flex-shrink: 0;
   margin-top: -6px;
   border-radius: 999px;
-  background: rgba(128, 128, 128, 0.25);
+  background: rgba(128, 128, 128, 0.35);
   overflow: hidden;
 }
 #progress-fill {
@@ -405,3 +410,19 @@ body.reduce-motion #star-moment-msg { transition: none; }
 #sleep-moon { width: 34px; height: 34px; flex: 0 0 auto; }
 #sleep-line { margin: 0; font-size: 17px; line-height: 1.45; }
 #sleep-line strong { font-variant-numeric: tabular-nums; }
+
+#end-row { flex-direction: column; gap: 8px; }
+#return-progress { width: min(260px, 80vw); margin: 0 auto; }
+
+/* Picking the break's length, when it was chosen at the end of a session */
+#pick-len { width: min(680px, 100%); text-align: center; }
+#pick-len-hint { margin: 0 0 10px; font-size: 17px; opacity: 0.8; }
+#pick-len-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.pick-btn {
+  font-family: inherit; font-size: 16px; font-weight: 600;
+  padding: 11px 26px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid rgba(128,128,128,0.45); background: transparent; color: inherit;
+  font-variant-numeric: tabular-nums;
+}
+.pick-btn:hover { border-color: #6aa3ff; color: #6aa3ff; }
+.pick-btn:disabled { opacity: 0.5; cursor: default; }

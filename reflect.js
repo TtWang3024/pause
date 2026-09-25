@@ -43,7 +43,7 @@ const celebrateMsg = document.getElementById("celebrate-msg");
 const celebrateName = document.getElementById("celebrate-name");
 const celebrateContinue = document.getElementById("celebrate-continue");
 
-// The pause wait greys the unlock exit until it has counted down, or until something is logged.
+// The pause wait greys the unlock exit until it has counted down.
 openBtn.disabled = true;
 
 const WAND_SMALL = 120;             // resting size on the star map (uses images/wand-120.png)
@@ -768,9 +768,7 @@ function paintDwell() {
   const now = Date.now();
   if (!document.hidden) dwellMs += now - dwellLast;
   dwellLast = now;
-  const secs = Math.floor(dwellMs / 1000);
-  urgeTimerEl.textContent =
-    String(Math.floor(secs / 60)).padStart(2, "0") + ":" + String(secs % 60).padStart(2, "0");
+
 }
 setInterval(paintDwell, 1000);
 
@@ -1218,10 +1216,8 @@ async function exitWith(intent) {
     return;
   }
   exitSaving = true;
-  // The star waits for the break that follows. "Open it anyway" with no break
-  // ahead (forced breaks off, not a caught site) lights it at once instead.
-  const breakFollows = !!(appSettings && appSettings.forceBreak) || groupId.startsWith("binge:");
-  const pending = intent === "relax" || (intent === "unlock" && breakFollows);
+  // Keep observations in history; only completed experiments light stars.
+  const pending = true; // Saved observation only; experiments light stars.
   const body = bodyTags
     .map((t) => ({ part: t.part, note: (t.note || "").trim() }))
     .filter((t) => t.part);
@@ -1234,7 +1230,7 @@ async function exitWith(intent) {
     ...(dwellMs > 1000 ? { dwellMs: Math.round(dwellMs) } : {}),   // how long you stayed with it
     ...(site ? { urge: site } : {}),
     ...(lastSummonIdx >= 0 ? { star: lastSummonIdx } : {}),   // the star you summoned is the one it shows
-    ...(pending ? { pending: true } : {})                       // unlit until the break finishes
+    ...(pending ? { pending: true } : {})                       // reflection only, never a sky award
   };
   for (const t of thoughts) {                      // frequency feeds the top-three pills
     const s = thoughtStats[t] || { n: 0, last: 0 };
@@ -1256,10 +1252,10 @@ async function exitWith(intent) {
     await routeExit(intent);                       // leaves the page; exitSaving stays set so nothing saves twice
     return;
   }
-  renderStars();                                   // re-place: the new star is now in the sky
-  celebrateExit = intent;
   exitSaving = false;
-  celebrate(entry.id);
+  resetFields();
+  closeCompose();
+  await routeExit(intent);
 }
 
 openBtn.addEventListener("click", () => {
@@ -1350,7 +1346,7 @@ composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverla
 
 // ---------- the pause wait, on "Open it anyway" ----------
 // The unlock exit shows "(in Ns)" until the group's pause length has counted down,
-// or until something is logged in the window, which opens the door at once. With
+// regardless of whether something is logged in the window. With
 // hold-to-continue on, the count runs only while the button is held; otherwise it
 // runs on its own while the window is open and the tab is visible. Progress is
 // kept per group, so closing the window or reloading resumes where it left off.
@@ -1364,10 +1360,8 @@ let pauseReady = false;     // true once the persisted remaining is loaded (guar
 function holdMode() { return !!(appSettings && appSettings.holdToContinue); }
 let holdActive = false;
 
-// The unlock door is open once the wait is over, or as soon as anything is logged
-// (a thought, a body tag, a feeling, a wave point). Taking it all out again brings
-// the wait back, wherever it had got to.
-function gateOpen() { return pauseDone || reflectionHasContent(); }
+// Reflection is optional and never buys faster access. Only the wait opens the door.
+function gateOpen() { return pauseDone; }
 
 function countdownCanRun() {
   if (holdMode()) return holdActive;           // hold-to-count-down: only while pressed
@@ -1377,20 +1371,18 @@ function countdownCanRun() {
 }
 
 function paintCountdown() {
-  if (gateOpen()) {
+  const ready = gateOpen();
+  openBtn.classList.toggle("gentle-wait", !ready);
+  openBtn.classList.toggle("is-still", !ready && holdMode() && !holdActive);
+  if (ready) {
     openBtn.textContent = "Open it anyway";
     openBtn.disabled = false;
     return;
   }
-  const secs = Math.max(0, Math.ceil(pauseRemaining / 1000));
-  if (holdMode()) {
-    openBtn.innerHTML = holdActive
-      ? 'Keep holding\u2026 <span class="cd-num">' + secs + '</span>'
-      : 'Open it anyway \u00b7 hold (<span class="cd-num">' + secs + '</span>s)';
-  } else {
-    openBtn.innerHTML = 'Open it anyway (in <span class="cd-num">' + secs + '</span>s)';
-  }
-  openBtn.disabled = !holdMode();              // must stay pressable to hold
+  openBtn.textContent = holdMode()
+    ? (holdActive ? "Keep holding…" : "Hold to pause")
+    : "Taking a moment…";
+  openBtn.disabled = !holdMode();
 }
 
 function finishCountdown() {
@@ -1588,7 +1580,7 @@ nativeCursorZone(winToggle);
     urgeDecisionEl.hidden = true;
     openBtn.classList.add("hidden");
     relaxBtn.classList.add("hidden");
-    mattersBtn.textContent = "Light this star ✨";
+    mattersBtn.textContent = "Save reflection";
   }
   thoughtStats = await loadThoughtStats();
   initPills();
@@ -1614,3 +1606,9 @@ nativeCursorZone(winToggle);
   try { await sky.load((p) => chrome.runtime.getURL(p)); } catch (e) {}
   renderStars();
 })();
+
+chrome.storage.onChanged.addListener(async (changes, area) => {
+  if (area !== "local" || !Object.keys(changes).some(key => key.startsWith("experiment:") || key === "reflectionLog")) return;
+  reflectionLog = await loadReflectionLog();
+  renderStars();
+});

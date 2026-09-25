@@ -1,0 +1,8 @@
+
+@keyframes pause-glow { 0%,100% { box-shadow: 0 0 5px rgba(220,181,96,.2); } 50% { box-shadow: 0 0 20px rgba(220,181,96,.55); } }
+.gentle-wait { animation: pause-glow 3.6s ease-in-out infinite; }
+.gentle-wait.is-still { animation-play-state: paused; }
+.quiet-progress { display:block; height:5px; width:min(100%,420px); margin:20px auto; border-radius:8px; background:rgba(140,155,173,.24); overflow:hidden; }
+.quiet-progress > span { display:block; height:100%; width:0; background:#adc99a; border-radius:inherit; }
+body.reduce-motion .gentle-wait { animation:none; box-shadow:0 0 10px rgba(220,181,96,.35); }
+@media(prefers-reduced-motion:reduce) { .gentle-wait { animation:none; box-shadow:0 0 10px rgba(220,181,96,.35); } }

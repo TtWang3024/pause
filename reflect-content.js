@@ -4,6 +4,21 @@
 (async function () {
   if (window.top !== window) return; // top frame only
 
+  // Restore a best-effort HTML5 playback position after an experiment, paused.
+  try {
+    const resume = await chrome.runtime.sendMessage({type:'experimentResume'});
+    if (resume?.playback) {
+      const until = Date.now() + 15000;
+      const restore = setInterval(() => {
+        if (!chrome.runtime?.id || Date.now() > until) { clearInterval(restore); return; }
+        const video = document.querySelectorAll('video')[resume.playback.index];
+        if (video && video.readyState >= 1) {
+          try { video.pause(); video.currentTime = resume.playback.time; clearInterval(restore); } catch {}
+        }
+      }, 250);
+    }
+  } catch {}
+
   let show = false;
   try {
     const res = await chrome.runtime.sendMessage({ type: "reflectIconCheck", url: location.href });
@@ -88,7 +103,7 @@
     </style>
     <img class="icon" src="${wandUrl}" alt="Reflect" title="Take a moment to reflect" />
     <div class="panel">
-      <h3>A moment of magic</h3>
+      <h3>A moment of magic</h3><div class="row"><button class="experiment" type="button">Try a small experiment</button></div>
       <label>Thoughts</label>
       <div class="chips" id="tchips"></div>
       <input id="tin" type="text" autocomplete="off" placeholder="What's on your mind? (press Enter)" />
@@ -115,6 +130,17 @@
   const tchips = root.getElementById("tchips");
   const bin = root.getElementById("bin");
   const doneEl = root.getElementById("done");
+
+  root.querySelector('.experiment').addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    const videos = [...document.querySelectorAll('video')];
+    const video = videos.find(v => !v.paused) || videos[0];
+    const playback = video ? {time:video.currentTime,index:videos.indexOf(video)} : null;
+    try {
+      const result = await chrome.runtime.sendMessage({type:'experimentLaunch',playback});
+      if (!result?.ok) throw new Error('Could not open');
+    } catch { event.target.disabled=false; doneEl.textContent='Could not open the experiment. Please try again.'; }
+  });
 
   let thoughts = [];
   let selectedMood = "";

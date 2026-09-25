@@ -6,11 +6,19 @@ const REFLECT_MAX_MONTHS = 6;
 
 // --- storage ---
 async function loadReflectionLog() {
-  const { reflectionLog } = await chrome.storage.local.get("reflectionLog");
-  return Array.isArray(reflectionLog) ? reflectionLog : [];
+  const all = await chrome.storage.local.get(null);
+  const notes = Array.isArray(all.reflectionLog) ? all.reflectionLog.filter(entry => !entry.experimentId) : [];
+  const experiments = Object.entries(all)
+    .filter(([key, entry]) => key.startsWith("experiment:") && entry.starLitAt && !entry.endedEarly)
+    .map(([, entry]) => ({
+      id: "experiment-star:" + entry.id, experimentId: entry.id, ts: entry.starLitAt,
+      thoughts: [entry.action || "A small experiment"], body: [], mood: [], star: 0
+    }));
+  return [...notes, ...experiments].sort((a, b) => b.ts - a.ts);
 }
 async function saveReflectionLog(list) {
-  await chrome.storage.local.set({ reflectionLog: list });
+  // Experiment stars are derived from their own records; saving a note cannot overwrite them.
+  await chrome.storage.local.set({ reflectionLog: list.filter(entry => !entry.experimentId) });
 }
 
 // ---- Mood = Russell circumplex (valence × arousal), four colour-coded quadrants ----
@@ -155,8 +163,7 @@ function waveDotR(step, full) {
   return step ? Math.max(1.6, Math.min(full, step * 0.35)) : full;
 }
 
-// A session's star is lit only once its break has finished: an entry saved on
-// "Open it anyway" or "Relax my body first" waits as `pending` until then.
+// Only completed experiment records produce lit stars. Notes remain in history.
 // The star picture: the one summoned on the reflection screen when known,
 // else a deterministic pick, so the same entry always shows the same star.
 const REFLECT_STAR_COUNT = 21;
@@ -176,7 +183,7 @@ function reflectionStars(log, windowMonths, nowTs) {
   const start = nowTs - windowMs;
   const stars = [];
   for (const entry of log) {
-    if (!entry || entry.ts < start || entry.pending) continue;   // pending: its break has not finished yet
+    if (!entry || !entry.experimentId || entry.ts < start) continue;   // Only completed experiments light the sky.
     const text = reflectionStarText(entry);
     if (!text) continue;                 // nothing logged → no star
     stars.push({ id: entry.id, text, ts: entry.ts });

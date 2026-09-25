@@ -481,3 +481,6 @@ chrome.runtime.onInstalled.addListener(async () => {
     chrome.runtime.openOptionsPage();
   }
 });
+
+// Voluntary small experiments share existing session limits.
+importScripts("experiment-background.js");

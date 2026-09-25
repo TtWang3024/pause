@@ -4,13 +4,15 @@
   <meta charset="UTF-8" />
   <title>Pause</title>
   <link rel="stylesheet" href="pause.css" />
+<link rel="stylesheet" href="gentle-progress.css">
 </head>
 <body>
   <main id="stage">
-    <div id="timer">00.00</div>
-    <p id="hint">Hold left-click anywhere to count down</p>
+    <div id="timer" role="img" aria-label="Pause in progress"></div>
+    <p id="hint">Hold left-click and take a moment</p>
     <p id="target"></p>
   </main>
   <script src="pause.js"></script>
+  <script src="experiment-launch.js"></script>
 </body>
 </html>

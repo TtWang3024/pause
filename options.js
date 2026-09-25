@@ -530,7 +530,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
           renderBreaks();
         });
         row.querySelector(".break-delete").addEventListener("click", async () => {
-          log = log.filter((x) => x.id !== entry.id);
+          if (entry.experimentId) await chrome.storage.local.remove("experiment:" + entry.experimentId);
+        log = log.filter((x) => x.id !== entry.id);
           await saveBreakLog(log);
           renderAll();
         });
@@ -676,9 +677,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
       row.className = "reflect-row";
       const when = document.createElement("span");
       when.className = "reflect-when"; when.textContent = formatDateTime(entry.ts);
-      if (entry.pending) {               // its star waits for the break to finish
+      if (!entry.experimentId) {         // observations remain in history without lighting stars
         const tag = document.createElement("span");
-        tag.className = "reflect-pending"; tag.textContent = "no break yet";
+        tag.className = "reflect-pending"; tag.textContent = "reflection";
         when.appendChild(tag);
       }
       const body = document.createElement("div");
@@ -705,6 +706,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
       del.className = "break-delete"; del.title = "Delete";
       del.innerHTML = '<span class="btn-icon ico-delete" aria-hidden="true"></span>';
       del.addEventListener("click", async () => {
+        if (entry.experimentId) await chrome.storage.local.remove("experiment:" + entry.experimentId);
         log = log.filter((x) => x.id !== entry.id);
         await saveReflectionLog(log);
         renderReflections();
@@ -714,9 +716,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
     });
   }
 
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.reflectionLog) {
-      log = Array.isArray(changes.reflectionLog.newValue) ? changes.reflectionLog.newValue : [];
+  chrome.storage.onChanged.addListener(async (changes, area) => {
+    if (area === "local" && Object.keys(changes).some(key => key === "reflectionLog" || key.startsWith("experiment:"))) {
+      log = await loadReflectionLog();
       renderReflections();
     }
     if (area === "sync" && changes.reflectionFeelings) {

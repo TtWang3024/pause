@@ -31,7 +31,6 @@ let totalMs = 0;
 let hintTimer = null;
 let ratingValue = null;   // -1 / 0 / +1 once tapped; stays null if skipped
 let reduceMotion = false; // e-ink / reduced motion: the star appears without its pop
-let sky = null;           // a headless sky map, only to name the star this session lands on
 
 function applyBackground(bg) {
   if (!bg) return;
@@ -54,12 +53,6 @@ function isLightColor(hex) {
   return (0.299 * r + 0.587 * g + 0.114 * b) > 160;
 }
 
-function format(ms) {
-  const secs = Math.max(0, Math.ceil(ms / 1000));
-  const m = Math.floor(secs / 60);
-  const s = secs % 60;
-  return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
-}
 
 function updateHint() {
   pickHintEl.textContent = `Pick up to ${MAX_PICK} things to do  (${selected.size}/${MAX_PICK})`;
@@ -377,13 +370,11 @@ function closeThisTab() {
 function tick() {
   if (finished) return;            // the back door ended it first
   const remaining = breakEnd - Date.now();
-  timeLeftEl.textContent = format(remaining);
   if (totalMs > 0) {
     const frac = Math.max(0, Math.min(1, (totalMs - remaining) / totalMs));
     progressFillEl.style.width = (frac * 100).toFixed(1) + "%";
   }
   if (remaining <= 0) {
-    timeLeftEl.textContent = "00:00";
     progressFillEl.style.width = "100%";
     finishBreak("done", durationMin);    // the break ends by itself: the whole length was rested
     return;
@@ -411,17 +402,15 @@ function backdoorLocked() {
 function paintBackdoor() {
   if (finished || returnBtn.classList.contains("hidden")) return;
   const lockedLeft = (breakEnd - totalMs) + LOCK_MS - Date.now();
-  if (lockedLeft > 0) {
-    returnBtn.classList.add("locked");
-    returnBtn.textContent = "I choose to return (in " + format(lockedLeft) + ")";
-    return;
-  }
-  returnBtn.classList.remove("locked");
-  const secs = Math.max(1, Math.ceil(holdLeft / 1000));
-  returnBtn.textContent =
-    holding ? "Keep holding… " + secs :
-    holdLeft < HOLD_MS ? "I choose to return · " + secs + "s left" :
-    "I choose to return";
+  const locked = lockedLeft > 0;
+  returnBtn.classList.toggle("locked", locked);
+  returnBtn.setAttribute("aria-disabled", String(locked));
+  returnBtn.textContent = locked ? "Rest a little first" : holding ? "Keep holding…" : "Hold to return";
+  const fraction = locked
+    ? 1 - lockedLeft / Math.max(LOCK_MS, 1)
+    : 1 - holdLeft / Math.max(HOLD_MS, 1);
+  document.getElementById("return-progress-fill").style.width = (Math.max(0, Math.min(1, fraction)) * 100) + "%";
+  document.getElementById("return-progress").setAttribute("aria-label", locked ? "Rest before returning" : "Hold progress");
 }
 
 function completeReturn() {
@@ -461,7 +450,7 @@ returnBtn.addEventListener("pointerup", stopHold);
 returnBtn.addEventListener("pointercancel", stopHold);
 returnBtn.addEventListener("pointerleave", stopHold);
 
-// ---- the end of a break: log it, light the session's star, show the star moment, move on ----
+// ---- the end of a break: log it and move on without a star award ----
 // Both endings come through here: 00:00 ("done", the whole length) and the back
 // door ("early", the real minutes). The guard means nothing below runs twice.
 async function finishBreak(kind, minutes) {
@@ -474,7 +463,7 @@ async function finishBreak(kind, minutes) {
   document.body.classList.add("finished");
   stageEl.inert = true;                            // no taps or tabbing into the page beneath the star
   await settleUrgeWave();
-  // One tab logs the break and lights the star; every other tab on this same
+  // One tab logs the break; every other tab on this same
   // break (or a reload after 00:00) just moves on.
   let first = true;
   try {
@@ -495,125 +484,12 @@ async function finishBreak(kind, minutes) {
     ...(ratingValue !== null ? { rating: ratingValue, group: groupId } : {})
   });
   await saveBreakLog(log);
-  if (settings?.magicStars === false) {            // no sky, no star: straight on, as before
-    await clearActiveUrge();
-    moveOn();
-    return;
-  }
-  const rest = {
-    ts: Date.now(),
-    durationMin: minutes,
-    activities: acts.map((a) => a.name),
-    ...(ratingValue !== null ? { rating: ratingValue } : {}),
-    early
-  };
-  const { entry, name } = await finalizeStar(rest);
   await clearActiveUrge();
-  showStarMoment(entry, name, rest);
+  moveOn();
 }
 
-// The session's star: the pending entry written on the reflection screen (found
-// through activeUrge) takes this rest and is lit; a break with no entry behind it
-// gets a rest-only entry of its own. Returns the entry and the name of the real
-// catalogue star it lands on.
-async function finalizeStar(rest) {
-  let site = "";
-  try { site = new URL(targetUrl).hostname.replace(/^www\./, ""); } catch (e) {}
-  const fresh = () => ({ id: genId("r"), ts: rest.ts, thoughts: [], body: [], mood: [], ...(site ? { urge: site } : {}), rest });
-  let entry = null, log = [];
-  try {
-    log = await loadReflectionLog();
-    const { activeUrge } = await chrome.storage.local.get("activeUrge");
-    const live = activeUrge && activeUrge.group === groupId && Date.now() - activeUrge.ts <= URGE_STALE_MS;
-    if (live) entry = log.find((r) => r.id === activeUrge.refId) || null;
-    if (entry) {
-      delete entry.pending;                        // lit now; it keeps the moment it was written
-      entry.rest = rest;
-    } else {
-      entry = fresh();
-      log.unshift(entry);
-    }
-    await saveReflectionLog(log);
-  } catch (e) {}
-  if (!entry) entry = fresh();                     // nothing could be saved; the moment still shows a star
-  let name = "";                                   // no name while the sky data is still arriving
-  try {
-    if (sky && sky.isLoaded()) {                   // the data may still be arriving on a very short break
-      const months = await loadWindowMonths();
-      sky.setReflections(reflectionStars(log, months, rest.ts).stars, months, rest.ts);
-      const ref = sky.getRef(entry.id);
-      if (ref) name = ref.name;
-    }
-  } catch (e) {}
-  return { entry, name };
-}
-
-// ---- the star moment: the star pops in the middle, the lines fade in below, and
-// the page moves on once the star has been in front for starSeconds ----
 const stageEl = document.getElementById("stage");
-const starMomentEl = document.getElementById("star-moment");
-const starMomentStar = document.getElementById("star-moment-star");
-const starMomentMsg = document.getElementById("star-moment-msg");
-const starMomentLine = document.getElementById("star-moment-line");
-const starMomentRest = document.getElementById("star-moment-rest");
-
-function showStarMoment(entry, name, rest) {
-  starMomentStar.src = entryStarSrc(entry);
-  starMomentLine.textContent = "";                 // "Your sky gained a star Vega." (or no name while the sky data is missing)
-  starMomentLine.append("Your sky gained a star");
-  if (name) { const n = document.createElement("strong"); n.id = "star-moment-name"; n.textContent = name; starMomentLine.append(" ", n); }
-  starMomentLine.append(".");
-  starMomentRest.textContent = rest.durationMin + " min rested" +
-    (rest.activities.length ? " · " + rest.activities.join(" · ") : "");
-  starMomentEl.classList.remove("hidden");
-  starMomentStar.classList.remove("pop", "static");
-  const reveal = () => { starMomentMsg.classList.add("show"); startStarClock(); };   // the seconds count once the star has landed
-  if (reduceMotion) {
-    starMomentStar.classList.add("static");        // present at full size, no scale pop
-    setTimeout(reveal, 250);
-  } else {
-    void starMomentStar.offsetWidth;               // restart the pop keyframes
-    starMomentStar.classList.add("pop");
-    setTimeout(reveal, 500);
-  }
-}
-
-// The clock behind the moment counts only while this tab is visible and in front,
-// so a star lit in a background tab waits to be seen. A tick only adds time when
-// the tab was in front at the previous tick too, and never more than half a
-// second, so a late tick from a throttled background tab cannot count in full.
-let starTotalMs = 3000;      // settings.starSeconds, read at init
-let starMs = 0;              // time in front so far
-let starLast = 0;
-let starFront = false;       // whether the previous tick found the tab in front
-let starTimer = null;
 let movedOn = false;
-
-function tabInFront() {
-  return document.visibilityState === "visible" && document.hasFocus();
-}
-
-function starTick() {
-  const t = Date.now();
-  const front = tabInFront();
-  if (front && starFront) starMs += Math.min(t - starLast, 500);
-  starFront = front;
-  starLast = t;
-  if (starMs >= starTotalMs) {
-    if (starTimer) clearInterval(starTimer);
-    moveOn();
-  }
-}
-
-function startStarClock() {
-  starLast = Date.now();
-  starFront = tabInFront();
-  starTimer = setInterval(starTick, 100);
-  // hidden tabs throttle timers: check again the moment the tab is back, or focus changes
-  document.addEventListener("visibilitychange", starTick);
-  window.addEventListener("focus", starTick);
-  window.addEventListener("blur", starTick);
-}
 
 // Where the sky returns: a standalone break just closes; otherwise the cycle
 // restarts on the reflection screen when Magic stars is on (its window then
@@ -637,19 +513,13 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   if (settings) {
     applyBackground(settings.background);
     messageEl.textContent = settings.breakMessage || "Take a break.";
-    if (Number.isFinite(settings.starSeconds) && settings.starSeconds > 0) starTotalMs = settings.starSeconds * 1000;
   }
   reduceMotion = (await loadReduceMotion()) ||
     !!(window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   if (reduceMotion) document.body.classList.add("reduce-motion");
-  // The sky map only names the star this session lands on. It loads in the
-  // background and is simply skipped if the break ends before the data arrives.
-  sky = createSkyMap(document.createElement("canvas"), {});
-  sky.load((p) => chrome.runtime.getURL(p)).catch(() => {});
   // The committed length comes from the URL; fall back to the max if absent.
   durationMin = Number.isFinite(minsParam) ? minsParam : 30;
   totalMs = durationMin * 60 * 1000;
-  breakLenEl.textContent = durationMin > 0 ? `${durationMin}-minute break` : "break";
   const gname = (settings && settings.groups ? (settings.groups.find((g) => g.id === groupId) || {}).name : "") || "";
   let gLabel = (!gname.trim() || gname.trim().toLowerCase() === "default") ? "this group" : gname.trim();
   if (groupId.startsWith("binge:")) gLabel = groupId.slice("binge:".length);   // a caught site: name the site
@@ -657,7 +527,7 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   else bindRating(gLabel);
   initUrgeWave();
   paintSleepCard();
-  paintSpentLine();
+  // Keep exact time totals in history, not on the break screen.
   activities = await ensureSeededActivities();
   updateHint();
   await recolourBoard();
@@ -679,6 +549,7 @@ customTag.addEventListener("keydown", (e) => { if (e.key === "Enter") onCustomAd
   }
   if (settings?.breakBackdoor !== false && Date.now() < breakEnd) {
     returnBtn.classList.remove("hidden");
+    document.getElementById("return-progress").classList.remove("hidden");
     paintBackdoor();
   }
   tick();

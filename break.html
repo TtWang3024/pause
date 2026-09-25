@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <title>Break</title>
   <link rel="stylesheet" href="break.css?v=3" />
+<link rel="stylesheet" href="gentle-progress.css">
 </head>
 <body>
   <main id="stage">
@@ -67,24 +68,14 @@
     <!-- The back door (ported from the Android app): on every break; the
          lock and hold lengths are set in Options. The break itself ends at 00:00. -->
     <div id="end-row">
-      <button id="return-btn" class="hidden" type="button">I choose to return</button>
+      <button id="return-btn" class="hidden" type="button">Hold to return</button>
+      <div id="return-progress" class="quiet-progress hidden" role="img" aria-label="Hold progress"><span id="return-progress-fill"></span></div>
     </div>
   </main>
 
-  <!-- The star moment: when the break ends, the session's star lights up here
-       for a few seconds before the sky returns. -->
-  <div id="star-moment" class="hidden">
-    <img id="star-moment-star" alt="" draggable="false" />
-    <div id="star-moment-msg">
-      <p class="sm-line">Thank you for resting.</p>
-      <p class="sm-line" id="star-moment-line">Your sky gained a star.</p>
-      <p class="sm-line" id="star-moment-rest"></p>
-    </div>
-  </div>
-
   <script src="breaks-common.js"></script>
   <script src="reflections-common.js"></script>
-  <script src="skymap.js"></script>
   <script src="break.js"></script>
+  <script src="experiment-launch.js"></script>
 </body>
 </html>

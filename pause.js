@@ -38,8 +38,7 @@ function isLightColor(hex) {
 }
 
 function renderTime() {
-  const secs = Math.max(0, remainingMs) / 1000;
-  timerEl.textContent = secs.toFixed(2);
+  timerEl.setAttribute("aria-label", remainingMs <= 0 ? "Pause complete" : "Pause in progress");
 }
 
 function tick(now) {
@@ -60,7 +59,7 @@ function tick(now) {
 function startHold() {
   if (holding || remainingMs <= 0) return;
   holding = true;
-  timerEl.classList.add("holding");
+  timerEl.classList.add("holding", "gentle-wait");
   timerEl.classList.remove("idle");
   lastTick = performance.now();
   rafId = requestAnimationFrame(tick);
@@ -69,7 +68,7 @@ function startHold() {
 function stopHold() {
   if (!holding) return;
   holding = false;
-  timerEl.classList.remove("holding");
+  timerEl.classList.remove("holding", "gentle-wait");
   timerEl.classList.add("idle");
   if (rafId) cancelAnimationFrame(rafId);
   rafId = null;
@@ -142,6 +141,8 @@ window.addEventListener("dragstart", (e) => e.preventDefault());
     totalMs = secs * 1000;
     remainingMs = totalMs;
   }
+  const { reflectReduceMotion } = await chrome.storage.sync.get("reflectReduceMotion");
+  if (reflectReduceMotion) document.body.classList.add("reduce-motion");
   timerEl.classList.add("idle");
   renderTime();
 })();

@@ -40,12 +40,11 @@ body.theme-white {
 }
 
 #timer {
-  font-size: clamp(96px, 22vw, 320px);
-  font-variant-numeric: tabular-nums;
-  font-weight: 500;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  transition: opacity 0.2s ease;
+  width: clamp(70px, 15vw, 140px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fbe9bb 0%, #dec07b 35%, transparent 72%);
+  transition: opacity .2s ease;
 }
 
 #timer.holding {
