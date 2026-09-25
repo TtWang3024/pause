@@ -62,6 +62,8 @@ When **Magic stars** is on (the default), each blocked session opens on an unhur
 
 ### Your sky of reflections
 
+Top left, a tally shows how many stars you lit **today** and **this week** (Monday to now). A star counts once it is lit, so a reflection still waiting for its break is not in the tally yet.
+
 The backdrop is a **real planetarium**, built from open Hipparcos-derived star data bundled offline:
 
 - **Drag to pan** across the dome, **scroll to zoom**. Real **constellation lines**, **constellation and bright-star names** (names fade in as you zoom), and a soft **Milky Way** band.

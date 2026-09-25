@@ -405,7 +405,26 @@ function trailFrame() {
 window.addEventListener("resize", () => { setupCanvas(); if (sky) sky.setSize(); washFromBg(); renderStars(); });
 
 // ---------- star map (real planetarium sky; reflections pinned to real stars) ----------
+// Stars lit today and this week (Monday to now). A star counts once it is lit:
+// pending entries wait for their break, like they do in the sky.
+function paintTally() {
+  const now = new Date();
+  const dayStart = new Date(now); dayStart.setHours(0, 0, 0, 0);
+  const weekStart = new Date(dayStart);
+  weekStart.setDate(dayStart.getDate() - ((dayStart.getDay() + 6) % 7));   // back to Monday
+  let today = 0, week = 0;
+  for (const e of reflectionLog) {
+    if (!e || e.pending || !reflectionStarText(e)) continue;
+    const lit = e.rest && e.rest.ts ? e.rest.ts : e.ts;                     // lit when the break ended, else when saved
+    if (lit >= weekStart.getTime()) week += 1;
+    if (lit >= dayStart.getTime()) today += 1;
+  }
+  document.getElementById("tally-today").textContent = String(today);
+  document.getElementById("tally-week").textContent = String(week);
+}
+
 function renderStars() {
+  paintTally();
   if (!sky || !sky.isLoaded()) return;
   const { stars } = reflectionStars(reflectionLog, windowMonths, Date.now());
   sky.setReflections(stars, windowMonths, Date.now());
@@ -1526,6 +1545,7 @@ winToggle.querySelectorAll(".win-btn").forEach((b) => {
 
 // native cursor over the always-visible control
 nativeCursorZone(winToggle);
+nativeCursorZone(document.getElementById("star-tally"));   // a normal pointer over the tally, so its tooltip reads
 
 // ---------- init ----------
 (async function init() {

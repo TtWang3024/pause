@@ -11,6 +11,12 @@
   <canvas id="skymap"></canvas>
   <div id="tooltip" class="hidden"></div>
 
+  <!-- Top left: how many stars you lit. Top right: the window the sky shows. -->
+  <div id="star-tally" title="Stars lit today and this week (a week starts on Monday)">
+    <span class="tally-item"><strong id="tally-today">0</strong> today</span>
+    <span class="tally-sep"></span>
+    <span class="tally-item"><strong id="tally-week">0</strong> this week</span>
+  </div>
   <div id="window-toggle">
     <button class="win-btn" data-m="1" type="button">1 month</button>
     <button class="win-btn" data-m="6" type="button">6 months</button>
