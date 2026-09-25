@@ -295,6 +295,7 @@ async function trackTick() {
     caught.push(site);
   }
   if (!caught.length) return;
+  if (await snoozeUntil()) return;                 // caught later, once the pause is over
 
   const { bingeSites = [] } = await chrome.storage.local.get("bingeSites");
   await chrome.storage.local.set({ bingeSites: bingeSites.concat(caught.filter((s) => !bingeSites.includes(s))) });
@@ -323,8 +324,126 @@ async function ensureTrackAlarm() {
 ensureTrackAlarm();
 chrome.runtime.onStartup.addListener(ensureTrackAlarm);
 
+function breakUrl(url, groupId, state) {
+  return BREAK_PAGE + "?url=" + encodeURIComponent(url) +
+    "&end=" + state.breakEnd +
+    "&group=" + encodeURIComponent(groupId) +
+    "&mins=" + (state.breakMinutes || "");
+}
+
+// ---------- the back door: switch blocking off for an hour ----------
+// Only the blocking pauses: no gate, no redirect at the end of a session, no
+// binge catch. Time per site keeps counting and open break tabs are left alone.
+// When the hour ends (or "Turn back on now"), every open tab on a blocked site
+// goes back to where the rules say it belongs.
+const SNOOZE_MS = 60 * 60 * 1000;
+const SNOOZE_ALARM = "snooze-end";
+const SNOOZE_KEEP_MS = 60 * 24 * 60 * 60 * 1000;   // keep 60 days of pause times
+
+async function snoozeUntil() {
+  const { snooze } = await chrome.storage.local.get("snooze");
+  return snooze && snooze.until > Date.now() ? snooze.until : 0;
+}
+
+// snoozeLog: [{ start, end }] (end is the planned end, moved earlier when you
+// turn it back on). Older saves hold bare start times, read as a full hour.
+function snoozeSpan(e) {
+  return typeof e === "number" ? { start: e, end: e + SNOOZE_MS } : e;
+}
+
+// Today's pauses: how many, when each began, and the minutes they left sites open.
+async function snoozeToday() {
+  const { snoozeLog = [] } = await chrome.storage.local.get("snoozeLog");
+  const now = Date.now();
+  const d = new Date(now); d.setHours(0, 0, 0, 0);
+  const dayStart = d.getTime();
+  const times = [];
+  let ms = 0;
+  for (const raw of snoozeLog) {
+    const e = snoozeSpan(raw);
+    if (!e || !Number.isFinite(e.start)) continue;
+    if (e.start >= dayStart) times.push(e.start);
+    ms += Math.max(0, Math.min(e.end, now) - Math.max(e.start, dayStart));
+  }
+  return { today: times.length, times: times.sort((a, b) => a - b), minutes: Math.round(ms / 60000) };
+}
+
+function paintSnoozeBadge(on) {
+  try {
+    chrome.action.setBadgeText({ text: on ? "off" : "" });
+    if (on) chrome.action.setBadgeBackgroundColor({ color: "#8a8f99" });
+  } catch (e) {}
+}
+
+async function startSnooze() {
+  const now = Date.now();
+  const until = now + SNOOZE_MS;
+  const { snoozeLog = [] } = await chrome.storage.local.get("snoozeLog");
+  const log = snoozeLog.map(snoozeSpan).filter((e) => e && now - e.start < SNOOZE_KEEP_MS);
+  log.push({ start: now, end: until });
+  await chrome.storage.local.set({ snooze: { until }, snoozeLog: log });
+  await chrome.alarms.create(SNOOZE_ALARM, { when: until });
+  paintSnoozeBadge(true);
+  // A tab waiting on a gate (pause, reflection or commit screen) goes on to its site.
+  const tabs = await chrome.tabs.query({});
+  for (const tab of tabs) {
+    const u = tab.url || "";
+    if (!(u.startsWith(REFLECT_PAGE) || u.startsWith(PAUSE_PAGE) || u.startsWith(COMMIT_PAGE))) continue;
+    let target = null;
+    try { target = new URL(u).searchParams.get("url"); } catch (e) {}
+    if (target && /^https?:/.test(target)) chrome.tabs.update(tab.id, { url: target });
+  }
+  return until;
+}
+
+async function endSnooze() {
+  const now = Date.now();
+  const { snoozeLog = [] } = await chrome.storage.local.get("snoozeLog");
+  const log = snoozeLog.map(snoozeSpan);
+  const last = log[log.length - 1];
+  if (last && last.end > now) { last.end = now; await chrome.storage.local.set({ snoozeLog: log }); }   // back on early: only the time it was really off counts
+  await chrome.storage.local.remove("snooze");
+  await chrome.alarms.clear(SNOOZE_ALARM);
+  paintSnoozeBadge(false);
+  await reblockAll();
+}
+
+// Put every open tab on a blocked site where it belongs right now: free during
+// an allowance, the break page during a break, otherwise the gate.
+async function reblockAll() {
+  const settings = await getSettings();
+  const useReflect = settings.magicStars !== false;
+  const { groupStates = {} } = await chrome.storage.local.get("groupStates");
+  const now = Date.now();
+  const tabs = await chrome.tabs.query({ url: ["http://*/*", "https://*/*"] });
+  for (const tab of tabs) {
+    if (!tab.url) continue;
+    const group = findGroupForUrl(tab.url, settings.groups);
+    if (!group || !scheduleActiveNow(group.schedule)) continue;
+    const state = groupStates[group.id];
+    if (state && now < state.allowanceEnd) continue;
+    if (state && now < state.breakEnd) { chrome.tabs.update(tab.id, { url: breakUrl(tab.url, group.id, state) }); continue; }
+    chrome.tabs.update(tab.id, { url: entryUrl(tab.url, group.id, useReflect) });
+  }
+}
+
+// A browser restart clears the badge; an hour that ran out while it was closed
+// ends the pause now.
+async function restoreSnooze() {
+  const { snooze } = await chrome.storage.local.get("snooze");
+  if (!snooze) return;
+  if (snooze.until > Date.now()) {
+    paintSnoozeBadge(true);
+    await chrome.alarms.create(SNOOZE_ALARM, { when: snooze.until });
+  } else {
+    await endSnooze();
+  }
+}
+chrome.runtime.onStartup.addListener(restoreSnooze);
+
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name === TRACK_ALARM) { await trackTick(); return; }
+  if (alarm.name === SNOOZE_ALARM) { await endSnooze(); return; }
   if (!alarm.name.startsWith("expire:")) return;
   const groupId = alarm.name.slice("expire:".length);
   const state = await getGroupState(groupId);
@@ -347,20 +466,18 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     await scheduleExpireAlarm(groupId);
     return;
   }
+  // While the back door is open the state still moves on, but no tab is moved;
+  // the end of the pause puts every tab where it belongs.
+  const paused = (await snoozeUntil()) > 0;
   if (now < state.breakEnd) {
     // Allowance just ended → kick the whole group into the break page, then schedule the break-end alarm.
-    await redirectTabsInGroup(group, (url) =>
-      BREAK_PAGE + "?url=" + encodeURIComponent(url) +
-      "&end=" + state.breakEnd +
-      "&group=" + encodeURIComponent(groupId) +
-      "&mins=" + (state.breakMinutes || "")
-    );
+    if (!paused) await redirectTabsInGroup(group, (url) => breakUrl(url, groupId, state));
     await chrome.alarms.create("expire:" + groupId, { when: state.breakEnd });
     return;
   }
   // Break is over (or there was none) → kick the whole group back to the entry
   // screen (commitment screen when a break is enforced, else the pause page).
-  await redirectTabsInGroup(group, (url) => entryUrl(url, groupId, settings.magicStars !== false));
+  if (!paused) await redirectTabsInGroup(group, (url) => entryUrl(url, groupId, settings.magicStars !== false));
   await setGroupState(groupId, null);
   await chrome.alarms.clear("expire:" + groupId);
 });
@@ -370,6 +487,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
   const url = details.url;
   if (!url.startsWith("http://") && !url.startsWith("https://")) return;
   if (url.startsWith(REFLECT_PAGE) || url.startsWith(COMMIT_PAGE) || url.startsWith(PAUSE_PAGE) || url.startsWith(BREAK_PAGE)) return;
+  if (await snoozeUntil()) return;                 // the back door is open
 
   const settings = await getSettings();
   const group = findGroupForUrl(url, settings.groups);
@@ -381,12 +499,7 @@ chrome.webNavigation.onBeforeNavigate.addListener(async (details) => {
 
   if (state && now < state.allowanceEnd) return;
   if (state && now < state.breakEnd) {
-    const redirect = BREAK_PAGE +
-      "?url=" + encodeURIComponent(url) +
-      "&end=" + state.breakEnd +
-      "&group=" + encodeURIComponent(group.id) +
-      "&mins=" + (state.breakMinutes || "");
-    chrome.tabs.update(details.tabId, { url: redirect });
+    chrome.tabs.update(details.tabId, { url: breakUrl(url, group.id, state) });
     return;
   }
   chrome.tabs.update(details.tabId, { url: entryUrl(url, group.id, settings.magicStars !== false) });
@@ -429,6 +542,22 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       if (first) { breakDone[msg.groupId] = key; await chrome.storage.local.set({ breakDone }); }
       sendResponse({ first });
     })();
+    return true;
+  }
+  // The popup's back door.
+  if (msg?.type === "snoozeStatus") {
+    (async () => sendResponse({ until: await snoozeUntil(), ...(await snoozeToday()) }))();
+    return true;
+  }
+  if (msg?.type === "snoozeStart") {
+    (async () => {
+      const until = (await snoozeUntil()) || await startSnooze();
+      sendResponse({ until, ...(await snoozeToday()) });
+    })();
+    return true;
+  }
+  if (msg?.type === "snoozeEnd") {
+    endSnooze().then(() => sendResponse({ ok: true }));
     return true;
   }
   // Break page: time spent today on the site behind this break.

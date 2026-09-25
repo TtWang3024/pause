@@ -119,6 +119,7 @@ Click the extension's icon for a quick popup:
 - **Block this domain** adds the hostname (for example `youtube.com`), covering all paths.
 - **Block this section** pre-fills the first two path segments (for example `youtube.com/shorts`); editable before you add.
 - The settings icon (top-right) opens the full settings page. Buttons show a check when the rule already exists.
+- **Pause blocking for 1 hour** (the back door, at the bottom). The first tap turns nothing off. It leads with which pause this would be today as a large ordinal (red from the 3rd), a dot and time for each earlier pause, and the cost in time ("2 h unblocked today. This makes 3 h."). Then two short steps through the body: two breaths with the ball (4 s in, 4 s out), then press both feet into the floor and hold the button for 5 seconds while you feel them (letting go starts it again). The steps are the same every time, however often you have paused. Only then does **Yes, pause** unlock and turn blocking off for an hour. Tabs waiting on a pause, reflection or "Before I open it" screen go on to their site, the icon wears an **off** badge, and the popup shows when blocking returns with a **Turn back on now** button. Only the blocking pauses: time per site keeps counting, open break tabs stay, and nothing is caught for binge-watching until the hour is over. When it ends, every open tab on a blocked site goes back to where it belongs (its gate, or its break).
 
 ### Settings page
 Add domains directly to a group's text area, one per line.

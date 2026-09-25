@@ -41,6 +41,41 @@
     </div>
 
     <p id="status"></p>
+
+    <!-- The back door: blocking off for an hour, two taps, with today's count first. -->
+    <section id="snooze">
+      <div id="snooze-idle">
+        <button id="snooze-ask" type="button" class="quiet">Pause blocking for 1 hour</button>
+      </div>
+      <div id="snooze-confirm" hidden>
+        <p class="sz-lead">This would be your</p>
+        <p id="sz-ordinal"></p>
+        <p class="sz-lead">pause today</p>
+        <div id="sz-dots"></div>
+        <p id="sz-cost"></p>
+
+        <!-- Before it turns off: breathe, then feel your feet. -->
+        <div id="sz-breath" class="sz-step">
+          <div id="sz-ball"></div>
+          <p id="sz-breath-cue" class="sz-cue">Breathe in…</p>
+          <p id="sz-breath-count" class="sz-sub"></p>
+        </div>
+        <div id="sz-feet" class="sz-step" hidden>
+          <p class="sz-cue">Press both feet into the floor.</p>
+          <button id="sz-feet-hold" type="button"><span id="sz-feet-fill"></span><span id="sz-feet-label">Hold while you feel them</span></button>
+        </div>
+
+        <div class="snooze-row">
+          <button id="snooze-cancel" type="button" class="quiet">Cancel</button>
+          <button id="snooze-yes" type="button" class="warn" disabled>Yes, pause</button>
+        </div>
+      </div>
+      <div id="snooze-on" hidden>
+        <p id="snooze-left" class="snooze-line"></p>
+        <p id="snooze-today" class="snooze-note"></p>
+        <button id="snooze-off" type="button" class="primary-solid">Turn back on now</button>
+      </div>
+    </section>
   </main>
 
   <script src="popup.js"></script>
