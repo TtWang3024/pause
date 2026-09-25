@@ -877,11 +877,16 @@ urgeInfoBtn.addEventListener("click", (e) => {   // a tap toggles it, for touch 
 // Evenly spaced, not placed on a clock (see waveLayout in reflections-common.js).
 const WAVE_DOT_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
 const WAVE_X0 = 14, WAVE_X1 = 392, WAVE_Y0 = 222, WAVE_YSPAN = 212;
+const WAVE_SHOW = 10;       // the window shows the last 10 points on this site
 let wavePts = [];           // [{ ts, v }]: tap time (kept in the log), level 0-10 in steps of 2
 
 function waveY(v) { return WAVE_Y0 - (v / 10) * WAVE_YSPAN; }
+function waveSite() {
+  try { return new URL(targetUrl).hostname.replace(/^www\./, ""); } catch (e) { return ""; }
+}
 function renderWave() {
-  const pts = recentWave(wavePts, Date.now());
+  const past = siteWaveHistory(reflectionLog, waveSite(), null);
+  const pts = waveToShow(past, wavePts, Date.now(), WAVE_SHOW, false);
   const { step, x } = waveLayout(pts.length, WAVE_X0, WAVE_X1);
   const r = waveDotR(step, 4.5);
   waveDots.innerHTML = "";
@@ -891,9 +896,10 @@ function renderWave() {
     c.setAttribute("cy", waveY(p.v).toFixed(1));
     c.setAttribute("r", r.toFixed(1));
     c.setAttribute("fill", WAVE_DOT_COLORS[p.v] || "#6aa3ff");
+    if (p.past) c.setAttribute("opacity", "0.45");   // an earlier session on this site
     waveDots.appendChild(c);
   });
-  paintCountdown();                                // a wave point opens the unlock door at once
+  paintCountdown();                                // refresh the remaining wait
   wavePath.setAttribute("d", wavePathD(pts.map((p, i) => [x(i), waveY(p.v)])));
 }
 function initWaveChart() {
@@ -1599,6 +1605,7 @@ nativeCursorZone(winToggle);
   windowMonths = await loadWindowMonths();
   paintToggle();
   reflectionLog = await loadReflectionLog();
+  renderWave();                                    // earlier sessions on this site fill the chart in
 
   sky = createSkyMap(skymapCanvas, {});
   sky.setLightMode(skyLight);

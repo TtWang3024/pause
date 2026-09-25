@@ -120,18 +120,40 @@ function reflectionStarText(entry) {
 // ---------- the urge wave chart (reflection window and break screen) ----------
 // Time is left out on purpose: each tap is one step to the right, so the curve
 // reads as a sequence and never folds back on itself. Steps start roomy and
-// shrink once the points would overflow the width. Only the last few hours show.
+// shrink once the points would overflow the width.
+// Earlier sessions on the same site fill the chart in (drawn faded), so there is
+// always a stretch of history to read, not just today's first tap.
 const WAVE_RECENT_MS = 4 * 60 * 60 * 1000;
 const WAVE_STEP_FRAC = 0.1;              // a roomy step is a tenth of the width
 
-function recentWave(pts, now) {
-  return (pts || []).filter((p) => p && now - p.ts <= WAVE_RECENT_MS);
+// Every wave point logged for `site` in other entries, oldest first, marked past.
+function siteWaveHistory(log, site, excludeId) {
+  if (!site) return [];
+  const out = [];
+  for (const e of log || []) {
+    if (!e || e.id === excludeId || e.urge !== site || !Array.isArray(e.wave)) continue;
+    for (const p of e.wave) if (p && Number.isFinite(p.ts)) out.push({ ts: p.ts, v: p.v, past: true });
+  }
+  return out.sort((a, b) => a.ts - b.ts);
+}
+
+// The points to draw: the last `count`, or, with keepRecent, every point from the
+// last 4 hours when there are more of those.
+function waveToShow(past, current, now, count, keepRecent) {
+  const all = (past || []).concat(current || []).sort((a, b) => a.ts - b.ts);
+  if (keepRecent) {
+    const recent = all.filter((p) => now - p.ts <= WAVE_RECENT_MS);
+    if (recent.length > count) return recent;
+  }
+  return all.slice(-count);
 }
 
 // x for point i of n, from x0 across to at most x1; also the step, for sizing dots.
-function waveLayout(n, x0, x1) {
+// `roomy` is the step while there is space (a tenth of the width by default).
+function waveLayout(n, x0, x1, roomy) {
   const w = x1 - x0;
-  const step = n > 1 ? Math.min(w * WAVE_STEP_FRAC, w / (n - 1)) : 0;
+  const r = roomy || w * WAVE_STEP_FRAC;
+  const step = n > 1 ? Math.min(r, w / (n - 1)) : 0;
   return { step, x: (i) => x0 + i * step };
 }
 

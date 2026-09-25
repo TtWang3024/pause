@@ -351,7 +351,7 @@ body.theme-white {
 }
 
 /* ---- the urge wave, continuing from the reflection screen ---- */
-#urge-wave { width: min(680px, 100%); margin: 4px 0 0; text-align: left; }
+#urge-wave { width: min(952px, 100%); margin: 4px 0 0; text-align: left; }   /* as wide as the activity board */
 #urge-wave.hidden { display: none; }
 #uw-prompt { margin: 0 0 8px; font-size: 15px; opacity: 0.75; }
 #uw-row { display: flex; gap: 8px; align-items: stretch; }

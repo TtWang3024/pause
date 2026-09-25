@@ -270,17 +270,34 @@ const uwGrid = document.getElementById("uw-grid");
 const uwPath = document.getElementById("uw-path");
 const uwDots = document.getElementById("uw-dots");
 const UW_COLORS = { 10: "#123a66", 8: "#1d4f86", 6: "#2f6cb8", 4: "#5b96f5", 2: "#9cc7ee", 0: "#c7dff5" };
-const UW_X0 = 10, UW_X1 = 392, UW_Y0 = 130, UW_YSPAN = 118;
+const UW_X0 = 10, UW_Y0 = 130, UW_YSPAN = 118;
+const UW_STEP = 38;         // the same roomy step as the reflection window, in pixels
+const UW_SHOW = 20;         // at least the last 20 points, or every point of the last 4 hours
+const uwChart = document.getElementById("uw-chart");
+let uwPast = [];            // earlier sessions' points on this site, drawn faded
 let urgeEntry = null;       // the reflection entry whose wave this break extends
 let uwSaving = false;
 let uwFrozen = false;       // set when the break ends: no more points, no more redraws
 
 function uwY(v) { return UW_Y0 - (v / 10) * UW_YSPAN; }
-// Same layout as the reflection window: one even step per tap, last 4 hours only.
+// Same layout as the reflection window, one even step per tap, on a chart as
+// wide as its box: the viewBox follows the box's pixel width, so nothing is
+// letterboxed and a wide screen simply holds more points at the roomy step.
 function uwRender() {
   if (!urgeEntry) return;
-  const pts = recentWave(urgeEntry.wave, Date.now());
-  const { step, x } = waveLayout(pts.length, UW_X0, UW_X1);
+  const W = Math.max(200, Math.round(uwChart.clientWidth || 400));
+  const UW_X1 = W - 10;
+  uwChart.setAttribute("viewBox", "0 0 " + W + " 140");
+  uwGrid.innerHTML = "";
+  [0, 2, 4, 6, 8, 10].forEach((v) => {
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", UW_X0); l.setAttribute("x2", UW_X1);
+    l.setAttribute("y1", uwY(v)); l.setAttribute("y2", uwY(v));
+    l.setAttribute("class", "uw-grid-line");
+    uwGrid.appendChild(l);
+  });
+  const pts = waveToShow(uwPast, urgeEntry.wave, Date.now(), UW_SHOW, true);
+  const { step, x } = waveLayout(pts.length, UW_X0, UW_X1, UW_STEP);
   const r = waveDotR(step, 3.5);
   uwDots.innerHTML = "";
   pts.forEach((p, i) => {
@@ -289,6 +306,7 @@ function uwRender() {
     c.setAttribute("cy", uwY(p.v).toFixed(1));
     c.setAttribute("r", r.toFixed(1));
     c.setAttribute("fill", UW_COLORS[p.v] || "#5b96f5");
+    if (p.past) c.setAttribute("opacity", "0.45");   // an earlier session on this site
     uwDots.appendChild(c);
   });
   uwPath.setAttribute("d", wavePathD(pts.map((p, i) => [x(i), uwY(p.v)])));
@@ -326,15 +344,12 @@ async function initUrgeWave() {
     if (!entry) return;
     if (!Array.isArray(entry.wave)) entry.wave = [];
     urgeEntry = entry;
+    let site = entry.urge || "";
+    if (!site) { try { site = new URL(targetUrl).hostname.replace(/^www\./, ""); } catch (e) {} }
+    uwPast = siteWaveHistory(log, site, entry.id);
   } catch (e) { return; }
-  [0, 2, 4, 6, 8, 10].forEach((v) => {
-    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
-    l.setAttribute("x1", UW_X0); l.setAttribute("x2", UW_X1);
-    l.setAttribute("y1", uwY(v)); l.setAttribute("y2", uwY(v));
-    l.setAttribute("class", "uw-grid-line");
-    uwGrid.appendChild(l);
-  });
   uwEl.classList.remove("hidden");
+  window.addEventListener("resize", uwRender);
   document.querySelectorAll(".uw-lvl").forEach((b) => {
     b.addEventListener("click", () => {
       if (uwFrozen) return;
