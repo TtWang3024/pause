@@ -66,48 +66,43 @@ body { background: #04040a; color: #fff; }
 
 /* compose modal — hidden until a star is opened. z-index sits above the window
    toggle and any summoned star (both z-index 4) so nothing can swallow its clicks. */
+/* The urge window is a page of its own: white, edge to edge, over the sky. */
 #compose-overlay {
   position: fixed; inset: 0; z-index: 50; display: none;
-  align-items: center; justify-content: center; padding: 24px;
-  background: rgba(0, 0, 0, 0.32);
+  padding: 0; overflow-y: auto;
+  background: #fff;
 }
-#compose-overlay.open { display: flex; }
-body.compose-light #compose-overlay { background: rgba(255, 255, 255, 0.4); }
+#compose-overlay.open { display: block; }
 
 #compose {
   position: relative;
   pointer-events: auto;
-  width: min(620px, 95vw);
-  max-height: 90vh; overflow-y: auto;
-  background: rgba(24, 24, 34, 0.93);
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 26px 22px 22px;
-  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.5);
+  width: min(620px, 92vw);
+  margin: 0 auto;
+  background: transparent;
+  color: #111;
+  padding: 18px 0 44px;
   display: flex; flex-direction: column; gap: 18px;
 }
-body.compose-light #compose {
-  background: rgba(255, 255, 255, 0.97); color: #111; border-color: rgba(0, 0, 0, 0.1);
-}
 
-#compose-close {
-  position: absolute; top: 10px; right: 12px; z-index: 5;   /* always on top, in clear space */
-  width: 30px; height: 30px; padding: 0;
-  border: none; background: none; color: inherit; cursor: pointer;
-  display: flex; align-items: center; justify-content: center; opacity: 0.6;
+/* The way back: an arrow to the sky, keeping whatever you have logged. */
+#compose-back {
+  align-self: flex-start;
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px 6px 8px; margin-bottom: -4px;
+  border: none; border-radius: 999px;
+  background: transparent; color: #555;
+  font-family: inherit; font-size: 15px; cursor: pointer;
 }
-#compose-close:hover { opacity: 1; }
-#compose-close svg { width: 24px; height: 24px; fill: currentColor; }
+#compose-back:hover, #compose-back:focus-visible { background: rgba(0, 0, 0, 0.06); color: #111; }
+#compose-back svg { width: 20px; height: 20px; }
 .ic-solid { display: none; }
-#compose-close:hover .ic-solid, #compose-close:focus-visible .ic-solid { display: block; }
-#compose-close:hover .ic-rr,    #compose-close:focus-visible .ic-rr    { display: none; }
 
 .body-tag.dragging { opacity: 0.45; }
 .drag-grip { cursor: grab; opacity: 0.4; font-size: 13px; line-height: 1; user-select: none; }
 
 /* ---- urge window (the compose card is an urge-surfing window) ---- */
-#urge-head { display: flex; align-items: center; gap: 10px; padding-right: 40px; text-align: left; }
+#urge-head { display: flex; align-items: center; gap: 10px; text-align: left; }
 #urge-mark { width: 22px; height: 22px; fill: #7fb1e8; flex: 0 0 auto; }
 #urge-title { font-size: 20px; font-weight: 700; flex: 1 1 auto; }
 #urge-timer { font-size: 15px; opacity: 0.65; font-variant-numeric: tabular-nums; }

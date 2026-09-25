@@ -6,7 +6,7 @@ const trailCanvas = document.getElementById("trail");
 const skymapCanvas = document.getElementById("skymap");
 const tooltipEl = document.getElementById("tooltip");
 const composeOverlay = document.getElementById("compose-overlay");
-const composeClose = document.getElementById("compose-close");
+const composeBack = document.getElementById("compose-back");
 const wandEl = document.getElementById("wand");
 const twinkleEl = document.getElementById("twinkle");
 const bodyFig = document.getElementById("body-fig");
@@ -1342,13 +1342,11 @@ celebrateContinue.addEventListener("click", () => {
   if (celebrateExit) { const x = celebrateExit; celebrateExit = null; routeExit(x); return; }
   dismissCelebration();
 });
-// ✕ behaves like "Back to what matters": light the star if anything was logged, then close the tab.
-composeClose.addEventListener("click", () => {
-  if (targetUrl) exitWith("matters");
-  else { resetFields(); closeCompose(); }
-});
-// clicking outside just puts the window away; what you logged stays for when you reopen a star
-composeOverlay.addEventListener("click", (e) => { if (e.target === composeOverlay) closeCompose(); });
+// "Return" steps back to the sky. Nothing is saved and nothing is lost: what you
+// logged is still here when you open the window again.
+composeBack.addEventListener("click", () => closeCompose());
+// The window fills the screen now, so only "Return" leaves it: a stray click on
+// the white margin must not drop you out of the reflection.
 
 // ---------- the pause wait, on "Open it anyway" ----------
 // The unlock exit shows "(in Ns)" until the group's pause length has counted down,
@@ -1543,23 +1541,10 @@ nativeCursorZone(winToggle);
   wandEl.src = "images/wand-120.png";   // resting on the star map; grows when you summon a star
   wandEl.addEventListener("error", () => { wandEl.src = WAND_FALLBACK; });
 
-  // The screen stays a night sky (the planetarium needs darkness), but the compose
-  // panel follows the pause-page theme — a light card on a light theme.
-  const isThemeLight = (bg) => {
-    if (!bg) return false;
-    if (bg.type === "preset") return bg.value === "white";
-    if (bg.type === "custom" && bg.value) {
-      const m = /^#?([0-9a-f]{6})$/i.exec(bg.value.trim());
-      if (!m) return false;
-      const v = parseInt(m[1], 16);
-      return (0.299 * ((v >> 16) & 255) + 0.587 * ((v >> 8) & 255) + 0.114 * (v & 255)) > 160;
-    }
-    return false;
-  };
   let settings = null;
   try { settings = await chrome.runtime.sendMessage({ type: "getSettings" }); } catch (e) {}
   appSettings = settings;
-  if (settings && isThemeLight(settings.background)) document.body.classList.add("compose-light");
+  document.body.classList.add("compose-light");   // the urge window is its own white page, whatever the sky is
 
   // user-defined star-map background; flip the screen + sky ink to stay readable on light colours
   const starmapBg = await loadStarmapBg();
